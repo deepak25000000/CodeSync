@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codesync-backend"
+version = "1.0.0"
+description = "CodeSync API: accepted-solution ingestion and GitHub synchronization"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = [
+    "B008",   # FastAPI Depends()/Query() inside defaults is idiomatic
+    "E501",   # line length enforced by the formatter where possible
+    "B905",   # zip(strict=) noise
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B017", "B011"]
+"alembic/env.py" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning:starlette",
+    "ignore::DeprecationWarning:fastapi",
+]
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true
+exclude = "alembic/versions"
