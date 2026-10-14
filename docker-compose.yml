@@ -1,0 +1,23 @@
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # REQUIRED — generate one with:
+      #   python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())"
+      CREDENTIALS_KEY: ${CREDENTIALS_KEY:?set CREDENTIALS_KEY in your environment or .env}
+      DATABASE_URL: sqlite:////data/codesync.db
+      ENVIRONMENT: production
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8000}
+      # Optional GitHub OAuth application
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      RATE_LIMIT_ENABLED: "true"
+      LOG_LEVEL: INFO
+    volumes:
+      - codesync-data:/data
+    restart: unless-stopped
+
+volumes:
+  codesync-data:
