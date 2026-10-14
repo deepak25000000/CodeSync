@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CodeSync</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"
+          />
+        </svg>
+        <h1>CodeSync</h1>
+      </div>
+      <span id="conn" class="chip chip-idle">checking</span>
+    </header>
+
+    <section class="stats" aria-label="Queue statistics">
+      <div class="stat">
+        <span id="stat-pending" class="stat-value">0</span>
+        <span class="stat-label">Pending</span>
+      </div>
+      <div class="stat">
+        <span id="stat-synced" class="stat-value">0</span>
+        <span class="stat-label">Synced</span>
+      </div>
+      <div class="stat">
+        <span id="stat-failed" class="stat-value">0</span>
+        <span class="stat-label">Failed</span>
+      </div>
+    </section>
+
+    <section class="queue-section">
+      <div class="section-head">
+        <h2>Queue</h2>
+        <span id="queue-meta" class="muted"></span>
+      </div>
+      <ul id="queue" class="queue"></ul>
+      <p id="queue-empty" class="empty">No submissions queued.</p>
+    </section>
+
+    <div id="last-sync" class="last-sync" hidden></div>
+
+    <section class="actions">
+      <button id="btn-sync-page" class="btn btn-primary" type="button">Sync this page</button>
+      <button id="btn-sync" class="btn" type="button">Sync now</button>
+      <button id="btn-pause" class="btn" type="button">Pause</button>
+      <button id="btn-clear-failed" class="btn btn-ghost" type="button">Clear failed</button>
+    </section>
+
+    <footer class="footer">
+      <button id="btn-options" class="btn btn-ghost" type="button">Open options</button>
+      <a id="repo-link" class="repo" href="#" target="_blank" rel="noopener" hidden></a>
+    </footer>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

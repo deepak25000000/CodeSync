@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "CodeSync",
+  "version": "1.0.0",
+  "description": "Detects accepted coding submissions on LeetCode, GeeksforGeeks, CodeChef and NeetCode, then syncs them into your GitHub repository.",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "CodeSync",
+    "default_popup": "popup/popup.html"
+  },
+  "options_page": "options/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.leetcode.com/*",
+        "https://*.geeksforgeeks.org/*",
+        "https://*.codechef.com/*",
+        "https://*.neetcode.io/*"
+      ],
+      "js": ["content/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

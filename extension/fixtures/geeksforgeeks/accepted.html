@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Two Sum | GeeksforGeeks</title>
+  </head>
+  <body>
+    <div class="problem-header">
+      <h3 class="problem-title">Two Sum</h3>
+      <span class="problem-code">114</span>
+    </div>
+    <div class="result">Correct Answer</div>
+    <div class="submission-time">
+      <time datetime="2026-01-03T08:30:00Z">Jan 3, 2026</time>
+    </div>
+    <div class="editor">
+      <div class="CodeMirror-code">
+        <div class="CodeMirror-line">class Solution:</div>
+        <div class="CodeMirror-line">    def twoSum(self, arr, target):</div>
+        <div class="CodeMirror-line">        seen = {}</div>
+        <div class="CodeMirror-line">        for i, v in enumerate(arr):</div>
+        <div class="CodeMirror-line">            if target - v in seen:</div>
+        <div class="CodeMirror-line">                return [seen[target - v], i]</div>
+        <div class="CodeMirror-line">            seen[v] = i</div>
+      </div>
+    </div>
+    <select id="language" name="language">
+      <option value="cpp">C++</option>
+      <option value="java">Java</option>
+      <option value="python3" selected>Python3</option>
+    </select>
+  </body>
+</html>
