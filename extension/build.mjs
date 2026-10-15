@@ -10,6 +10,7 @@ const watch = process.argv.includes('--watch');
 
 const entryPoints = {
   'content/content': path.join(root, 'src/content/index.js'),
+  'content/bridge-main': path.join(root, 'src/content/bridge-main.js'),
   background: path.join(root, 'src/background/service-worker.js'),
   'popup/popup': path.join(root, 'src/popup/popup.js'),
   'options/options': path.join(root, 'src/options/options.js'),

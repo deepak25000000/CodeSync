@@ -25,6 +25,18 @@
       "js": ["content/content.js"],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.leetcode.com/*",
+        "https://*.geeksforgeeks.org/*",
+        "https://*.codechef.com/*",
+        "https://*.neetcode.io/*"
+      ],
+      "js": ["content/bridge-main.js"],
+      "world": "MAIN",
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ]
 }

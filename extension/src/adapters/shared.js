@@ -178,10 +178,35 @@ function cleanEditorText(text) {
   return cleaned.trim() ? cleaned : null;
 }
 
+// Full text of virtualized editors (Monaco/ACE) captured by the page-world
+// bridge (content/bridge.js). DOM extraction only sees the lines rendered in
+// the viewport, so long solutions would otherwise be truncated silently.
+let bridgeText = { monaco: null, ace: null, at: 0 };
+
+export function setBridgeText(next) {
+  bridgeText = {
+    monaco: next && next.monaco ? String(next.monaco) : null,
+    ace: next && next.ace ? String(next.ace) : null,
+    at: (next && next.at) || Date.now(),
+  };
+}
+
+export function getBridgeText() {
+  return bridgeText;
+}
+
 export function editorText(el) {
   if (!el) return null;
   if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
     return cleanEditorText(el.value);
+  }
+  const bridge = bridgeText;
+  const classes = el.classList;
+  if (classes && classes.contains('monaco-editor') && bridge.monaco) {
+    return cleanEditorText(bridge.monaco);
+  }
+  if (bridge.ace && classes && (classes.contains('ace_editor') || (el.querySelector && el.querySelector('.ace_content')))) {
+    return cleanEditorText(bridge.ace);
   }
   const lines = queryAll(el, '.cm-line, .CodeMirror-line, .view-line, .ace_line');
   if (lines.length) {

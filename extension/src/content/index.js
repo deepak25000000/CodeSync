@@ -2,6 +2,7 @@ import { buildManualSubmission, matchHost, normalize_submission } from '../adapt
 import { isAllowedUrl } from '../shared/hostallow.js';
 import { fail, ok, validateContentMessage } from '../shared/schema.js';
 import { sendRuntimeMessage } from '../shared/messaging.js';
+import { requestBridge } from './bridge.js';
 
 const emitted = new Set();
 let lastHealth = null;
@@ -62,11 +63,17 @@ function scan(now = Date.now()) {
   }
 }
 
+function scanFresh() {
+  // Refresh full editor text (Monaco/ACE virtualize long documents) before
+  // scanning; resolves immediately when the page-world bridge is unavailable.
+  requestBridge().then(scan);
+}
+
 function scheduleScan(delay = 400) {
   if (debounceTimer) return;
   debounceTimer = setTimeout(() => {
     debounceTimer = null;
-    scan();
+    scanFresh();
   }, delay);
 }
 
@@ -79,6 +86,9 @@ async function handleSyncPage() {
   if (!adapter.detectPage(url, document)) {
     return ok({ submission: null, reason: 'unsupported_page', platform: adapter.id });
   }
+  // Ask the page-world bridge for the complete editor text first so long,
+  // off-screen solutions sync in full instead of viewport-truncated.
+  await requestBridge(400);
   const found = pageSubmission(adapter, document, url, Date.now());
   if (!found.submission) {
     return ok({ submission: null, reason: 'nothing_found', platform: adapter.id });
@@ -129,9 +139,9 @@ function bootstrap() {
     });
   }
 
-  scan();
+  scanFresh();
   for (const delay of [1500, 4000, 10000]) {
-    setTimeout(() => scan(), delay);
+    setTimeout(() => scanFresh(), delay);
   }
 }
 

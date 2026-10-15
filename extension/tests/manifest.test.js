@@ -27,12 +27,19 @@ describe('manifest.json', () => {
   });
 
   it('declares exactly the four platform content script hosts', () => {
-    expect(manifest.content_scripts).toHaveLength(1);
-    const [contentScript] = manifest.content_scripts;
+    expect(manifest.content_scripts).toHaveLength(2);
+    const [contentScript, bridge] = manifest.content_scripts;
     expect(contentScript.matches).toEqual(EXPECTED_MATCHES);
     expect(contentScript.run_at).toBe('document_idle');
     expect(contentScript.all_frames).toBe(false);
     expect(contentScript.js).toEqual(['content/content.js']);
+    // Page-world bridge: reads full Monaco/ACE text (viewport-virtualized in
+    // the DOM) and answers the isolated content script over postMessage.
+    expect(bridge.matches).toEqual(EXPECTED_MATCHES);
+    expect(bridge.world).toBe('MAIN');
+    expect(bridge.run_at).toBe('document_idle');
+    expect(bridge.all_frames).toBe(false);
+    expect(bridge.js).toEqual(['content/bridge-main.js']);
   });
 
   it('uses a classic background service worker', () => {

@@ -59,7 +59,13 @@ describe('build output', () => {
   });
 
   it('emits classic-script bundles without static module syntax or eval', () => {
-    for (const file of ['background.js', 'content/content.js', 'popup/popup.js', 'options/options.js']) {
+    for (const file of [
+      'background.js',
+      'content/content.js',
+      'content/bridge-main.js',
+      'popup/popup.js',
+      'options/options.js',
+    ]) {
       const code = readDist(file);
       expect(code.length).toBeGreaterThan(200);
       expect(code).not.toMatch(/(^|\n)\s*import\s[\s*{]/);
