@@ -125,9 +125,27 @@ describe('codechef adapter', () => {
     );
   });
 
+  it('ignores a stale SPA title and promo h1, falling back to the URL slug', () => {
+    const doc = fixtureDoc('codechef/stale-title.html');
+    const url =
+      'https://www.codechef.com/practice/course/linked-lists-new/LINKEDP04/problems/LINKLEN';
+    expect(codechef.extractProblemMetadata(doc, url)).toEqual({
+      title: 'LINKLEN',
+      problem_id: 'LINKLEN',
+      url,
+      platform: 'codechef',
+    });
+  });
+
   it('returns nulls instead of throwing when selectors are missing', () => {
     const doc = fixtureDoc('codechef/missing.html');
-    expect(codechef.extractProblemMetadata(doc, PROBLEM_URL)).toBeNull();
+    // No title source in the DOM: the URL slug is still the right problem.
+    expect(codechef.extractProblemMetadata(doc, PROBLEM_URL)).toEqual({
+      title: 'TEST',
+      problem_id: 'TEST',
+      url: PROBLEM_URL,
+      platform: 'codechef',
+    });
     expect(codechef.extractSubmissionStatus(doc)).toBe('unknown');
     expect(codechef.extractSolutionCode(doc)).toBeNull();
     expect(codechef.detect_submission(doc, PROBLEM_URL)).toBeNull();

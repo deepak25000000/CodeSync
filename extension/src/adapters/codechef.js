@@ -44,10 +44,12 @@ const LANGUAGE_SELECTORS = [
   '.lang-dropdown',
 ];
 
+// Problem-title elements only. A bare `h1` is deliberately NOT trusted:
+// CodeChef problem pages have no h1 of their own, so any h1 we find is a
+// promo/onboarding heading (e.g. "Welcome to the CodeChef AI Tutor").
 const TITLE_SELECTORS = [
   '.problem-title',
   '[class*="problem-title"]',
-  'h1',
 ];
 
 const codechef = {
@@ -91,10 +93,23 @@ const codechef = {
   extractProblemMetadata(doc, url) {
     const slug = slugFromUrl(url, /\/problems\/([^/]+)/);
     const suffixes = [' | CodeChef', ' - CodeChef'];
-    const rawTitle = firstText(doc, TITLE_SELECTORS) || cleanTitle(doc.title, suffixes);
-    let title = cleanTitle(rawTitle, suffixes);
-    // <title> format: "Two Sum Practice Problem in Linked Lists" → "Two Sum"
-    if (title) title = title.replace(/\s+Practice Problem in .+$/i, '').trim() || title;
+    // "Two Sum Practice Problem in Linked Lists" → "Two Sum"
+    const stripMarker = (t) => t.replace(/\s+Practice Problem in\s+.+$/i, '').trim() || t;
+
+    // CodeChef renders a per-problem server <title> carrying the "Practice
+    // Problem in <course>" marker, but the SPA keeps a STALE document.title
+    // after client-side navigation (a leaked welcome-page title once caused a
+    // different problem's file to be overwritten). So <title> is trusted ONLY
+    // with that marker; otherwise fall back to problem-title elements and
+    // finally to the URL slug, which is always the problem actually open.
+    let title = '';
+    const tagTitle = cleanTitle(doc.title, suffixes);
+    if (tagTitle && /practice problem in\s+/i.test(tagTitle)) title = stripMarker(tagTitle);
+    if (!title) {
+      const fromElements = cleanTitle(firstText(doc, TITLE_SELECTORS), suffixes);
+      if (fromElements) title = stripMarker(fromElements);
+    }
+    if (!title && slug) title = slug;
     if (!title) return null;
     return {
       title,
