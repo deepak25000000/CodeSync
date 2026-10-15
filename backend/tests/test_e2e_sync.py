@@ -170,6 +170,48 @@ class TestFailurePaths:
             "octo/dsa", "DSA-Solutions/LeetCode/0001-two-sum.py", "main"
         )
 
+    def test_stale_title_never_clobbers_another_problems_file(
+        self, client: TestClient, auth_headers: dict, app, fake_github
+    ):
+        from app.services.fingerprint import fingerprint_marker
+
+        _connect_and_configure(client, auth_headers)
+        # A CodeSync-created file for a DIFFERENT problem already owns the
+        # stale title's path (as happened when CodeChef's SPA kept an old
+        # document.title and LINKLEN synced into the welcome problem's file).
+        stale_path = "DSA-Solutions/CodeChef/welcome-to-the-codechef-ai-tutor.py"
+        owned = (
+            fingerprint_marker("a" * 64)
+            + "\n# Problem: Welcome to the CodeChef AI Tutor\n"
+            + "# Problem ID: AITUTOR\nprint('old')\n"
+        ).encode()
+        fake_github.put_file("octo/dsa", stale_path, "main", owned)
+
+        linklen_url = (
+            "https://www.codechef.com/practice/course/linked-lists-new/LINKEDP04/problems/LINKLEN"
+        )
+        client.post(
+            "/api/v1/submissions",
+            json=make_body(
+                platform="codechef",
+                title="Welcome to the CodeChef AI Tutor",  # stale title
+                problem_id="LINKLEN",
+                url=linklen_url,
+                external_id="987654321",
+                language="python",
+            ),
+            headers=auth_headers,
+        )
+        assert drain(app) == 1
+
+        job = client.get("/api/v1/sync", headers=auth_headers).json()["items"][0]
+        assert job["state"] == "SYNCED"
+        assert job["file_path"] == "DSA-Solutions/CodeChef/linklen.py"
+        # the other problem's file is untouched
+        assert fake_github.get_file("octo/dsa", stale_path, "main") == owned
+        new_file = fake_github.get_file("octo/dsa", "DSA-Solutions/CodeChef/linklen.py", "main")
+        assert new_file is not None and b"LINKLEN" in new_file
+
     def test_rate_limited_by_github_schedules_retry(
         self, client: TestClient, auth_headers: dict, app, fake_github
     ):

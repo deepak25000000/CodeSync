@@ -32,6 +32,7 @@ from app.services.filegen import (
     build_file_content,
     build_progress_json,
     build_repo_path,
+    header_problem_id,
     update_readme,
 )
 from app.services.fingerprint import find_marker
@@ -208,6 +209,32 @@ class SyncWorker:
 
         async with self.github_factory(token) as gh:
             existing = await gh.get_file(settings_row.repo_full_name, path, settings_row.branch)
+
+            if _belongs_to_other_problem(existing, submission.problem_id):
+                # The title-derived path holds a DIFFERENT problem (a stale or
+                # duplicated title must never clobber another problem's file):
+                # give this problem its own problem-id filename instead.
+                alt_path: str | None = None
+                try:
+                    alt_path = build_repo_path(
+                        settings_row,
+                        submission.platform,
+                        {
+                            "title": submission.title,
+                            "language": language,
+                            "problem_id": submission.problem_id,
+                        },
+                        prefer_problem_id=True,
+                    )
+                except Exception:
+                    logger.exception("problem-id fallback path failed; keeping title path")
+                if alt_path and alt_path != path:
+                    path = alt_path
+                    job.file_path = path
+                    commit_message = _commit_message(submission, path)
+                    existing = await gh.get_file(
+                        settings_row.repo_full_name, path, settings_row.branch
+                    )
 
             if existing is not None:
                 outcome = await self._handle_existing_file(
@@ -403,6 +430,23 @@ class SyncWorker:
                 http_status=err.http_status,
             )
         )
+
+
+def _belongs_to_other_problem(existing: dict[str, Any] | None, problem_id: str | None) -> bool:
+    """True only on explicit evidence that a CodeSync file belongs to another problem.
+
+    Requires the existing file to carry a `Problem ID:` header that differs from
+    this submission's id. Files without that header (hand-written or legacy) keep
+    their normal conflict/overwrite handling.
+    """
+    if existing is None or not problem_id:
+        return False
+    try:
+        current = b64decode(existing.get("content") or "").decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return False
+    owner = header_problem_id(current)
+    return owner is not None and owner.lower() != problem_id.lower()
 
 
 def _commit_message(submission: Submission, path: str) -> str:

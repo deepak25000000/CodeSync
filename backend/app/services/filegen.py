@@ -122,9 +122,19 @@ def problem_number(problem_id: str | None) -> str | None:
     return None
 
 
-def build_filename(submission_like: dict) -> str:
-    """Build `0001-two-sum.py` style filename from a plain dict."""
+def build_filename(submission_like: dict, *, stem_source: str | None = None) -> str:
+    """Build `0001-two-sum.py` style filename from a plain dict.
+
+    `stem_source` overrides the title-derived slug with an explicit,
+    problem-unique stem (used when the title path is owned by another problem).
+    """
     ext = language_to_extension(submission_like.get("language", ""))
+    if stem_source is not None:
+        slug = sanitize_slug(stem_source)
+        filename = f"{slug}.{ext}"
+        if len(filename) > 120:
+            filename = f"{slug[:100].strip('-')}.{ext}"
+        return filename
     slug = sanitize_slug(submission_like.get("title") or "")
     number = problem_number(submission_like.get("problem_id"))
     stem = f"{number}-{slug}" if number else slug
@@ -134,7 +144,9 @@ def build_filename(submission_like: dict) -> str:
     return filename
 
 
-def build_repo_path(settings: UserSettings, platform: str, submission_like: dict) -> str:
+def build_repo_path(
+    settings: UserSettings, platform: str, submission_like: dict, *, prefer_problem_id: bool = False
+) -> str:
     platform_dir = PLATFORM_DIRS.get(platform)
     if platform_dir is None:
         raise FilenameError(f"Unknown platform: {platform!r}")
@@ -147,8 +159,31 @@ def build_repo_path(settings: UserSettings, platform: str, submission_like: dict
     root = settings.root_folder.strip("/ ") or "DSA-Solutions"
     if not re.fullmatch(r"[A-Za-z0-9._\- ]+", root):
         root = sanitize_slug(root)
-    filename = build_filename(submission_like)
+    stem_source: str | None = None
+    if prefer_problem_id:
+        problem_id = (submission_like.get("problem_id") or "").strip()
+        if not problem_id:
+            raise FilenameError("prefer_problem_id requires a problem id")
+        stem_source = problem_id
+    filename = build_filename(submission_like, stem_source=stem_source)
     return f"{root}/{platform_dir}/{filename}"
+
+
+_PROBLEM_ID_HEADER = re.compile(
+    r"^[ \t]*(?:#|--|//|/\*|\*)?[ \t]*Problem ID:[ \t]*(\S+)", re.MULTILINE
+)
+
+
+def header_problem_id(content: str | None) -> str | None:
+    """Read the `Problem ID:` line CodeSync wrote into an existing file header.
+
+    Returns None for files without that header (hand-written or legacy content),
+    so callers can only ever conclude "foreign problem" from explicit evidence.
+    """
+    if not content:
+        return None
+    match = _PROBLEM_ID_HEADER.search(content)
+    return match.group(1) if match else None
 
 
 _HEADER_LANG = {

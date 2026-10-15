@@ -15,6 +15,7 @@ from app.services.filegen import (
     build_filename,
     build_progress_json,
     build_repo_path,
+    header_problem_id,
     language_to_extension,
     sanitize_slug,
     update_readme,
@@ -117,6 +118,61 @@ class TestRepoPath:
         settings = UserSettings(user_id=1, root_folder="Solutions")
         with pytest.raises(FilenameError):
             build_repo_path(settings, "hackerrank", {"title": "X", "language": "py"})
+
+
+class TestProblemIdFilename:
+    """prefer_problem_id: a unique path per problem, immune to stale titles."""
+
+    def test_prefer_problem_id_ignores_stale_title(self):
+        settings = UserSettings(user_id=1, root_folder="DSA-Solutions")
+        path = build_repo_path(
+            settings,
+            "codechef",
+            {
+                "title": "Welcome to the CodeChef AI Tutor",
+                "language": "python",
+                "problem_id": "LINKLEN",
+            },
+            prefer_problem_id=True,
+        )
+        assert path == "DSA-Solutions/CodeChef/linklen.py"
+
+    def test_prefer_problem_id_requires_id(self):
+        from app.services.filegen import FilenameError
+
+        settings = UserSettings(user_id=1, root_folder="Solutions")
+        with pytest.raises(FilenameError):
+            build_repo_path(
+                settings,
+                "codechef",
+                {"title": "X", "language": "py", "problem_id": None},
+                prefer_problem_id=True,
+            )
+
+    def test_default_path_unaffected_without_flag(self):
+        settings = UserSettings(user_id=1, root_folder="DSA-Solutions")
+        path = build_repo_path(
+            settings, "codechef", {"title": "Linklen", "language": "py", "problem_id": "LINKLEN"}
+        )
+        assert path == "DSA-Solutions/CodeChef/linklen.py"
+
+
+class TestHeaderProblemId:
+    def test_hash_header(self):
+        content = "# codesync-fp:" + "f" * 64 + "\n# Problem ID: LINKLEN\n"
+        assert header_problem_id(content) == "LINKLEN"
+
+    def test_sql_header(self):
+        assert header_problem_id("-- Problem ID: bubble-sort\n") == "bubble-sort"
+
+    def test_block_comment_body(self):
+        content = "(*\n  Problem ID: foo\n  Platform: x\n*)\n"
+        assert header_problem_id(content) == "foo"
+
+    def test_missing_header_returns_none(self):
+        assert header_problem_id("# codesync-fp:x\n# Problem: Two Sum\n") is None
+        assert header_problem_id("") is None
+        assert header_problem_id(None) is None
 
 
 class TestFileContent:
