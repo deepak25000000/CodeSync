@@ -48,6 +48,8 @@ describe('build output', () => {
     const targets = [
       manifest.background.service_worker,
       ...manifest.content_scripts.flatMap((entry) => entry.js),
+      ...Object.values(manifest.icons || {}),
+      ...Object.values((manifest.action && manifest.action.default_icon) || {}),
       manifest.action.default_popup,
       manifest.action.default_popup.replace('.html', '.css'),
       manifest.options_page,
@@ -55,6 +57,18 @@ describe('build output', () => {
     ];
     for (const target of targets) {
       expect(existsSync(path.join(dist, target)), `${target} missing`).toBe(true);
+    }
+  });
+
+  it('generates valid PNG icons', () => {
+    for (const size of [16, 32, 48, 128]) {
+      const png = readFileSync(path.join(dist, `icons/icon-${size}.png`));
+      expect(png.length, `icon-${size}.png`).toBeGreaterThan(50);
+      // PNG signature + IHDR chunk
+      expect([...png.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      expect(png.subarray(12, 16).toString('latin1')).toBe('IHDR');
+      expect(png.readUInt32BE(16)).toBe(size);
+      expect(png.readUInt32BE(20)).toBe(size);
     }
   });
 

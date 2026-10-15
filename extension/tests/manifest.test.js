@@ -60,6 +60,23 @@ describe('manifest.json', () => {
     expect(manifest.background.service_worker).not.toMatch(/^https?:/);
   });
 
+  it('declares local icon assets', () => {
+    expect(manifest.icons).toEqual({
+      '16': 'icons/icon-16.png',
+      '32': 'icons/icon-32.png',
+      '48': 'icons/icon-48.png',
+      '128': 'icons/icon-128.png',
+    });
+    expect(manifest.action.default_icon).toEqual({
+      '16': 'icons/icon-16.png',
+      '32': 'icons/icon-32.png',
+      '48': 'icons/icon-48.png',
+    });
+    for (const icon of [...Object.values(manifest.icons), ...Object.values(manifest.action.default_icon)]) {
+      expect(icon).toMatch(/^icons\/icon-\d+\.png$/);
+    }
+  });
+
   it('points at local popup and options pages', () => {
     expect(manifest.action.default_popup).toBe('popup/popup.html');
     expect(manifest.options_page).toBe('options/options.html');

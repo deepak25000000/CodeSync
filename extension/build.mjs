@@ -3,6 +3,7 @@ import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { generateIcons } from './scripts/make-icons.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const outdir = path.join(root, 'dist');
@@ -63,6 +64,7 @@ async function assertManifestTargets() {
     ...(manifest.content_scripts || []).flatMap((cs) => cs.js || []),
     manifest.action && manifest.action.default_popup,
     manifest.options_page,
+    ...(manifest.icons ? Object.values(manifest.icons) : []),
     ...(manifest.action && manifest.action.default_icon
       ? Object.values(manifest.action.default_icon)
       : []),
@@ -76,6 +78,7 @@ async function assertManifestTargets() {
 
 async function run() {
   await copyStatic();
+  await generateIcons(path.join(outdir, 'icons'));
   const result = await build({ ...options, write: true, metafile: true });
   await writeMetafile(result);
   await assertManifestTargets();
@@ -94,6 +97,7 @@ if (watch) {
             await copyStatic();
             if (!result.errors.length) {
               try {
+                await generateIcons(path.join(outdir, 'icons'));
                 await writeMetafile({ metafile: result.metafile });
                 await assertManifestTargets();
               } catch (err) {
