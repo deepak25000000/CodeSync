@@ -1,5 +1,6 @@
 import { VERDICTS } from '../shared/config.js';
 import { stableFingerprint, validateSubmission } from '../shared/schema.js';
+import { detectLanguage } from './shared.js';
 import leetcode from './leetcode.js';
 import geeksforgeeks from './geeksforgeeks.js';
 import codechef from './codechef.js';
@@ -78,11 +79,18 @@ export function buildManualSubmission(adapter, doc, url, { now = Date.now(), cod
   if (!adapter || !adapter.capabilities.manual_sync) return null;
   const metadata = adapter.extractProblemMetadata(doc, url);
   if (!metadata) return null;
+  // Manual "Sync page" must carry whatever solution code is visible in the
+  // editor — the backend refuses to sync an empty file (CODE_UNAVAILABLE).
+  const editorCode =
+    code ||
+    (adapter.capabilities.solution_code_extraction && adapter.extractSolutionCode
+      ? adapter.extractSolutionCode(doc)
+      : null);
   return normalize_submission(adapter, {
     metadata,
     verdict: 'manual',
-    code,
-    language: language || 'unknown',
+    code: editorCode,
+    language: language || detectLanguage(doc, adapter.languageSelectors || []) || 'unknown',
     external_id: null,
     submitted_at: now,
   });

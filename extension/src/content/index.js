@@ -51,7 +51,8 @@ function scan(now = Date.now()) {
   if (!raw) return;
   if (raw.verdict === 'accepted') {
     const submission = normalize_submission(adapter, raw);
-    if (!submission || emitted.has(submission.fingerprint)) return;
+    if (!submission || !submission.code || !submission.code.trim()) return;
+    if (emitted.has(submission.fingerprint)) return;
     emitted.add(submission.fingerprint);
     emit(submission);
     return;
@@ -80,6 +81,12 @@ async function handleSyncPage() {
   }
   const found = pageSubmission(adapter, document, url, Date.now());
   if (!found.submission) {
+    return ok({ submission: null, reason: 'nothing_found', platform: adapter.id });
+  }
+  // The backend cannot sync an empty file (CODE_UNAVAILABLE). Refuse to enqueue
+  // a doomed job: tell the user to open the editor/result view or paste code
+  // in Options → Manual submission instead.
+  if (!found.submission.code || !found.submission.code.trim()) {
     return ok({ submission: null, reason: 'nothing_found', platform: adapter.id });
   }
   if (found.mode !== 'auto' && found.submission.verdict !== 'accepted') {

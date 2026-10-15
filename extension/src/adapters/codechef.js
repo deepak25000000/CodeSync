@@ -24,6 +24,10 @@ const STATUS_SELECTORS = [
 ];
 
 const CODE_SELECTORS = [
+  // Live CodeChef practice pages render an ACE editor (#submit-ide-v2).
+  '#submit-ide-v2',
+  '.ace_editor:not(.ace_autocomplete)',
+  '.ace_content',
   '.CodeMirror-code',
   '.cm-content',
   '.monaco-editor',
@@ -78,15 +82,19 @@ const codechef = {
     return (
       /\/problems\/[^/]+/.test(pathname) ||
       /\/submissions\/[^/]+/.test(pathname) ||
-      /\/viewsubmission\/\d+/.test(pathname) ||
-      /\/practice\/problems\//.test(pathname)
+      /\/(?:viewsubmission|viewsolution)\/\d+/.test(pathname) ||
+      /\/practice\/problems\//.test(pathname) ||
+      /\/practice\/course\/[^/]+\/[^/]+\/problems\/[^/]+/.test(pathname)
     );
   },
 
   extractProblemMetadata(doc, url) {
     const slug = slugFromUrl(url, /\/problems\/([^/]+)/);
-    const rawTitle = firstText(doc, TITLE_SELECTORS) || cleanTitle(doc.title, [' | CodeChef', ' - CodeChef']);
-    const title = cleanTitle(rawTitle, [' | CodeChef', ' - CodeChef']);
+    const suffixes = [' | CodeChef', ' - CodeChef'];
+    const rawTitle = firstText(doc, TITLE_SELECTORS) || cleanTitle(doc.title, suffixes);
+    let title = cleanTitle(rawTitle, suffixes);
+    // <title> format: "Two Sum Practice Problem in Linked Lists" → "Two Sum"
+    if (title) title = title.replace(/\s+Practice Problem in .+$/i, '').trim() || title;
     if (!title) return null;
     return {
       title,
@@ -105,7 +113,7 @@ const codechef = {
   },
 
   extractSubmissionId(doc, url) {
-    const fromUrl = slugFromUrl(url, /\/(?:submissions|viewsubmission)\/([^/]+)/);
+    const fromUrl = slugFromUrl(url, /\/(?:submissions|viewsubmission|viewsolution)\/([^/]+)/);
     if (fromUrl) return fromUrl;
     const text = findText(doc, ['#submission-id', '.submission-id', '[class*="submission-id"]'], /#?\d{3,}/);
     const match = text && /(\d{3,})/.exec(text);

@@ -30,11 +30,13 @@ export const LANG_TOKENS = [
 export const VERDICT_RULES = [
   {
     verdict: 'rejected',
-    re: /wrong answer|time limit exceeded|memory limit exceeded|runtime error|compilation error|compile error|output limit exceeded|internal error|judging error|presentation error|accepted with warnings|segfault/i,
+    re: /wrong answer|partially correct|time limit exceeded|memory limit exceeded|runtime error|compilation error|compile error|output limit exceeded|internal error|judging error|presentation error|accepted with warnings|segfault/i,
   },
   {
     verdict: 'accepted',
-    re: /correct answer|\baccepted\b/i,
+    // GFG: "Problem Solved Successfully"; CodeChef: "Correct"/"Correct Answer";
+    // LeetCode: "Accepted". Bare "correct" is anchored to avoid prose matches.
+    re: /correct answer|problem solved successfully|^\s*correct\s*$|\baccepted\b/im,
   },
   {
     verdict: 'pending',
@@ -163,7 +165,7 @@ export function editorText(el) {
   if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
     return cleanEditorText(el.value);
   }
-  const lines = queryAll(el, '.cm-line, .CodeMirror-line, .view-line');
+  const lines = queryAll(el, '.cm-line, .CodeMirror-line, .view-line, .ace_line');
   if (lines.length) {
     return cleanEditorText(lines.map((line) => line.textContent).join('\n'));
   }

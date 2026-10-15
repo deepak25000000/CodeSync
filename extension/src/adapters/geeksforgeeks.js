@@ -23,6 +23,10 @@ const STATUS_SELECTORS = [
 ];
 
 const CODE_SELECTORS = [
+  // Live GFG problem pages render an ACE editor (#ace-editor), not CodeMirror.
+  '#ace-editor',
+  '.ace_editor:not(.ace_autocomplete)',
+  '.ace_content',
   '.CodeMirror-code',
   '.cm-content',
   '.monaco-editor',
@@ -32,6 +36,9 @@ const CODE_SELECTORS = [
 ];
 
 const LANGUAGE_SELECTORS = [
+  // Semantic-UI dropdown: selected value lives in .divider.text ("C (gcc 5.4)").
+  '[class*="language_dropdown"] .divider.text',
+  '[class*="language_dropdown"]',
   'select#language',
   'select#lang',
   '#language-select',
@@ -43,6 +50,7 @@ const TITLE_SELECTORS = [
   '.problem-title',
   'h3.problem-title',
   '[itemprop="name"]',
+  '[class*="problems_header_content"] h3',
   'h1',
 ];
 
@@ -80,8 +88,9 @@ const geeksforgeeks = {
 
   extractProblemMetadata(doc, url) {
     const slug = slugFromUrl(url, /\/problems\/([^/]+)/);
-    const rawTitle = firstText(doc, TITLE_SELECTORS) || cleanTitle(doc.title, [' | GeeksforGeeks', ' - GeeksforGeeks']);
-    const title = cleanTitle(rawTitle, [' | GeeksforGeeks', ' - GeeksforGeeks']);
+    const suffixes = [' | GeeksforGeeks', ' - GeeksforGeeks', ' | Practice'];
+    const rawTitle = firstText(doc, TITLE_SELECTORS) || cleanTitle(doc.title, suffixes);
+    const title = cleanTitle(rawTitle, suffixes);
     if (!title) return null;
     const codeText = firstText(doc, ['.problem-code', '#problemCode', '[class*="problem-code"]']);
     return {

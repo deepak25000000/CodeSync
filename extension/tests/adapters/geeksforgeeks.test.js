@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import geeksforgeeks from '../../src/adapters/geeksforgeeks.js';
-import { normalize_submission } from '../../src/adapters/index.js';
+import { buildManualSubmission, normalize_submission } from '../../src/adapters/index.js';
 import { stableFingerprint } from '../../src/shared/schema.js';
 import { fixtureDoc } from '../helpers/fixtures.js';
 
 const PROBLEM_URL = 'https://www.geeksforgeeks.org/problems/two-sum/114/';
+const ACE_URL = 'https://www.geeksforgeeks.org/problems/bubble-sort/1';
 
 describe('geeksforgeeks adapter', () => {
   it('handles geeksforgeeks hosts only', () => {
@@ -61,6 +62,43 @@ describe('geeksforgeeks adapter', () => {
     expect(submission.fingerprint).toBe(
       stableFingerprint('geeksforgeeks', null, PROBLEM_URL, 'Python3', code),
     );
+  });
+
+  it('extracts an accepted submission from the live ACE editor DOM', () => {
+    const doc = fixtureDoc('geeksforgeeks/ace.html');
+    const metadata = geeksforgeeks.extractProblemMetadata(doc, ACE_URL);
+    expect(metadata).toEqual({
+      title: 'Bubble Sort',
+      problem_id: 'bubble-sort',
+      url: ACE_URL,
+      platform: 'geeksforgeeks',
+    });
+    expect(geeksforgeeks.extractSubmissionStatus(doc)).toBe('accepted');
+
+    const code = geeksforgeeks.extractSolutionCode(doc);
+    expect(code).toContain('void bubbleSort(int *arr, int n)');
+    expect(code).toContain('}');
+
+    const raw = geeksforgeeks.detect_submission(doc, ACE_URL);
+    expect(raw.verdict).toBe('accepted');
+    expect(raw.language).toBe('C');
+    const submission = normalize_submission(geeksforgeeks, raw);
+    expect(submission).toMatchObject({
+      title: 'Bubble Sort',
+      verdict: 'accepted',
+      language: 'C',
+    });
+  });
+
+  it('builds a manual submission with code and a detected language', () => {
+    const doc = fixtureDoc('geeksforgeeks/ace.html');
+    const submission = buildManualSubmission(geeksforgeeks, doc, ACE_URL, {
+      now: Date.parse('2026-02-11T10:00:00Z'),
+    });
+    expect(submission).not.toBeNull();
+    expect(submission.verdict).toBe('manual');
+    expect(submission.language).toBe('C');
+    expect(submission.code).toContain('bubbleSort');
   });
 
   it('extracts a rejected submission', () => {
