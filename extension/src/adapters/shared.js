@@ -2,6 +2,7 @@ export const LANG_TOKENS = [
   { re: /\btypescript\b/i, name: 'TypeScript' },
   { re: /\bpython\s*(?:3|3\.\d+|\d+)\b/i, name: 'Python3' },
   { re: /\bpython\d*\b/i, name: 'Python' },
+  { re: /\bpypy\s*\d*\b/i, name: 'Python3' },
   { re: /\bjavascript\b/i, name: 'JavaScript' },
   { re: /\bnode\.?js\b/i, name: 'Node.js' },
   { re: /\bkotlin\b/i, name: 'Kotlin' },
@@ -10,6 +11,8 @@ export const LANG_TOKENS = [
   { re: /\bruby\b/i, name: 'Ruby' },
   { re: /\bscala\b/i, name: 'Scala' },
   { re: /\bdart\b/i, name: 'Dart' },
+  { re: /\belixir\b/i, name: 'Elixir' },
+  { re: /\berlang\b/i, name: 'Erlang' },
   { re: /\bc\+\+/i, name: 'C++' },
   { re: /\bcpp\b/i, name: 'C++' },
   { re: /\bc#|\bcsharp\b/i, name: 'C#' },
@@ -125,7 +128,22 @@ function languageCandidates(el) {
     const option = index >= 0 ? el.options?.[index] : el.querySelector('option[selected]');
     return [option && option.value, option && option.textContent, el.value].filter(Boolean);
   }
-  return [el.getAttribute && el.getAttribute('value'), el.value, textOf(el)].filter(Boolean);
+  // Custom dropdowns (semantic-ui, MUI, LeetCode): the *selected* entry must win.
+  // textOf(el) over the whole container would concatenate every hidden option,
+  // letting the first matching LANG_TOKEN (e.g. TypeScript) shadow the real
+  // selection (e.g. Python3) — so container text is only the last resort.
+  const selected =
+    el.querySelector &&
+    el.querySelector(
+      '[aria-selected="true"],[aria-checked="true"],[data-selected="true"],.divider.text,.selected,[class*="selected"]',
+    );
+  return [
+    el.getAttribute && el.getAttribute('value'),
+    el.value,
+    selected && textOf(selected),
+    el.getAttribute && el.getAttribute('aria-label'),
+    textOf(el),
+  ].filter(Boolean);
 }
 
 function detectOnElement(el) {

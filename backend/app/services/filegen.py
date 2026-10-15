@@ -27,6 +27,8 @@ LANGUAGE_EXTENSIONS: dict[str, str] = {
     "javascript": "js",
     "js": "js",
     "node": "js",
+    "node.js": "js",  # extension emits canonical "Node.js"
+    "nodejs": "js",
     "typescript": "ts",
     "ts": "ts",
     "csharp": "cs",
@@ -42,6 +44,7 @@ LANGUAGE_EXTENSIONS: dict[str, str] = {
     "dart": "dart",
     "r": "r",
     "elixir": "ex",
+    "erlang": "erl",  # LeetCode language
     "haskell": "hs",
     "perl": "pl",
     "bash": "sh",
@@ -50,7 +53,15 @@ LANGUAGE_EXTENSIONS: dict[str, str] = {
     "mysql": "sql",
     "oracle": "sql",
     "mariadb": "sql",
-    "pypy": "py",
+    "postgres": "sql",  # extension emits canonical "PostgreSQL"
+    "postgresql": "sql",
+    "mssql": "sql",  # extension emits canonical "MS SQL"
+    "ms sql": "sql",
+    "sql server": "sql",
+    "plain text": "txt",  # extension emits canonical "Plain Text"
+    "text": "txt",
+    "txt": "txt",
+    "pypy": "py",  # extension maps PyPy3 -> "Python3"; bare PyPy also lands here
     "pypy3": "py",
     # common aliases (language or bare extension)
     "py": "py",
@@ -61,6 +72,7 @@ LANGUAGE_EXTENSIONS: dict[str, str] = {
     "hs": "hs",
     "ex": "ex",
     "pl": "pl",
+    "erl": "erl",
     "lua": "lua",
     "ml": "ml",
 }
