@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 
@@ -115,7 +118,7 @@ class TestRepos:
 
     def test_requires_github_connection(self, client: TestClient, token: str):
         # revoke the GitHub credential, keep the API token
-        with client.app.state.db.session() as session:
+        with cast(FastAPI, client.app).state.db.session() as session:
             from sqlalchemy import select
 
             from app.models import OAuthConnection
@@ -135,7 +138,7 @@ class TestGithubConnectionCheck:
         assert body == {"connected": True, "github_login": "octo"}
 
     def test_disconnected(self, client: TestClient, token: str):
-        with client.app.state.db.session() as session:
+        with cast(FastAPI, client.app).state.db.session() as session:
             from sqlalchemy import select
 
             from app.models import OAuthConnection

@@ -7,6 +7,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -103,12 +104,12 @@ class FakeGitHub:
                 status = self.contents_status
                 return httpx.Response(status, json={"message": f"injected {status}"})
             head, rel = path.split("/contents/", 1)
-            repo = head[len("/repos/") :]
+            repo_slug = head[len("/repos/") :]
             from urllib.parse import unquote
 
             rel = unquote(rel)
             branch = request.url.params.get("ref", "main")
-            key = (repo, rel, branch)
+            key = (repo_slug, rel, branch)
             if request.method == "GET":
                 content = self.files.get(key)
                 if content is None:
@@ -120,14 +121,18 @@ class FakeGitHub:
                         "path": rel,
                         "sha": _sha(content),
                         "content": base64.b64encode(content).decode(),
-                        "download_url": f"https://raw.example/{repo}/{rel}",
+                        "download_url": f"https://raw.example/{repo_slug}/{rel}",
                     },
                 )
             data = json.loads(request.content)
             raw = base64.b64decode(data.get("content", ""))
             self.files[key] = raw
-            commit = {"sha": hashlib.sha1(f"{repo}{rel}{len(self.commits)}".encode()).hexdigest()}
-            self.commits.append({"repo": repo, "path": rel, "message": data.get("message", "")})
+            commit = {
+                "sha": hashlib.sha1(f"{repo_slug}{rel}{len(self.commits)}".encode()).hexdigest()
+            }
+            self.commits.append(
+                {"repo": repo_slug, "path": rel, "message": data.get("message", "")}
+            )
             return httpx.Response(
                 201, json={"commit": commit, "content": {"sha": _sha(raw), "path": rel}}
             )
@@ -143,7 +148,7 @@ def _sha(content: bytes) -> str:
 
 
 def make_settings(tmp_path: Path, **overrides) -> Settings:
-    defaults = {
+    defaults: dict[str, Any] = {
         "environment": "test",
         "database_url": f"sqlite:///{tmp_path / 'test.db'}",
         "credentials_key": "unit-test-key",

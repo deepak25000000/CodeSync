@@ -26,7 +26,7 @@ jobs:
       - name: Ruff format check
         run: ruff format --check .
       - name: Mypy
-        run: mypy app
+        run: mypy app tests
       - name: Pytest
         run: pytest -q
 

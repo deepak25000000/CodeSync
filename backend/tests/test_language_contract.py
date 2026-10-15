@@ -17,9 +17,7 @@ import pytest
 
 from app.services.filegen import UnsupportedLanguageError, language_to_extension
 
-SHARED_JS = (
-    Path(__file__).resolve().parents[2] / "extension" / "src" / "adapters" / "shared.js"
-)
+SHARED_JS = Path(__file__).resolve().parents[2] / "extension" / "src" / "adapters" / "shared.js"
 
 
 def _extension_language_names() -> list[str]:
