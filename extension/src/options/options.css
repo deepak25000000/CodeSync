@@ -195,6 +195,19 @@ textarea {
   border-radius: 4px;
 }
 
+.setup-steps {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.setup-steps li {
+  margin: 5px 0;
+}
+
+.setup-steps strong {
+  color: var(--text, inherit);
+}
+
 .hint-error {
   color: var(--err);
 }

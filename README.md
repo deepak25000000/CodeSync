@@ -26,6 +26,11 @@ Key properties:
   not create.
 * **Durable retries.** Jobs run through `QUEUED → SYNCING → SYNCED` with bounded
   exponential backoff + jitter, rate-limit awareness and a full per-attempt audit log.
+* **Language-accurate files.** The extension detects the language you actually
+  submitted in (25+ languages: Python/Python3, C++, Java, JavaScript, TypeScript,
+  Go, Rust, Kotlin, Swift, C#, Ruby, PHP, Scala, Dart, Elixir, Erlang, R, Bash,
+  SQL dialects, …) and the backend maps it to the matching file extension — a
+  contract test parses the extension's language table so the two can never drift.
 
 ## Repository layout
 
@@ -63,27 +68,39 @@ docker compose up --build
 
 ## Quickstart — extension
 
+**Install from a release (no Node.js needed):**
+
+1. Grab `extension/release/codesync-extension-vX.Y.Z.zip` from this repository,
+   extract it into any folder (keep it somewhere stable).
+2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**,
+   and select the extracted folder.
+3. Open the extension **Options** and follow the **First-time setup** card: set the
+   API base URL (`http://127.0.0.1:8000`), paste the API token from the portal, pick
+   a repository (or create one), enable the platforms you use, save.
+4. Solve and submit a problem on LeetCode / GeeksforGeeks / CodeChef — the solution
+   file (in the language you submitted), `progress.json` and a progress README
+   section land in your repo automatically.
+
+**Build from source (contributors):**
+
 ```bash
 cd extension
 npm install
-npm run build          # outputs dist/
+npm test             # full suite
+npm run release      # test + build + release zip in extension/release/
+npm run build        # plain build -> dist/ (load *this* in chrome://extensions)
 ```
 
-1. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**,
-   select `extension/dist`.
-2. Open the extension **Options**: set the API base URL (`http://127.0.0.1:8000`),
-   paste the API token from the portal, pick a repository (or create one), and enable
-   the platforms you use.
-3. Solve and submit a problem on LeetCode / GeeksforGeeks / CodeChef — the solution
-   file, `progress.json` and a progress README section land in your repo automatically.
+After any code change, run `npm run build` and press **Reload** on the extension
+card in `chrome://extensions` — `dist/` is a build artifact and is never committed.
 
 ## Testing
 
 ```bash
-# backend — 145 tests: unit + API integration + E2E against a mocked GitHub
+# backend — 148 tests: unit + API integration + E2E against a mocked GitHub
 cd backend && pytest
 
-# extension — 113 tests: adapter fixtures, schema validation, queue/backoff, manifest
+# extension — 134 tests: adapter fixtures, language contract, bridge, queue/backoff, manifest
 cd extension && npm test
 ```
 
@@ -108,5 +125,7 @@ Full details: [docs/SECURITY.md](docs/SECURITY.md).
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model and controls |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common failures and fixes |
 | [docs/ACCEPTANCE_TESTS.md](docs/ACCEPTANCE_TESTS.md) | Human verification checklist (live sites) |
+| [docs/RELEASE.md](docs/RELEASE.md) | Cutting a release, packaging, versioning |
+| [docs/STORE_LISTING.md](docs/STORE_LISTING.md) | Chrome Web Store submission package |
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Phase plan |
 | [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md) | Delivery report, test results, known limits |
