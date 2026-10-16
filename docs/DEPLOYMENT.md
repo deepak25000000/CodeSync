@@ -86,39 +86,37 @@ The extension and GitHub OAuth both want a stable **HTTPS** URL. Two options:
 
 ### Option A — you own a domain (recommended, stable URL)
 
-Use **Cloudflare Tunnel** (free) so the VM needs no open inbound ports:
+Use a **Cloudflare tunnel** (free) so the VM needs no open inbound ports and gets a
+stable HTTPS URL. Everything is configured from the Cloudflare dashboard — no
+certificate or firewall work:
+
+1. **Add the domain to Cloudflare** — free account at <https://dash.cloudflare.com>
+   → *Add a domain* → follow the wizard (it asks you to change the nameservers at
+   your registrar) → wait until the domain shows **Active**.
+2. **Create the tunnel:** *Zero Trust → Networks → Tunnels → Create a tunnel →
+   Cloudflared* → name it `codesync` → the next screen shows an install command
+   containing your **tunnel token** — copy it (private; you'll run it on the VM).
+3. **Add the public hostname** on the same page: *Public Hostname → Add a public
+   hostname* → Subdomain `codesync`, Domain `yourdomain.com`, Service `HTTP`,
+   URL `http://127.0.0.1:8000` → Save.
+4. **On the VM**, install cloudflared and start the tunnel service:
 
 ```bash
 curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
 echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
 sudo apt update && sudo apt install -y cloudflared
-
-cloudflared tunnel login                      # pick your domain in the browser
-cloudflared tunnel create codesync
-cloudflared tunnel route dns codesync codesync.yourdomain.com
-sudo cloudflared service install --token <paste-token-from-previous-command>
+sudo cloudflared service install <TOKEN-FROM-STEP-2>
+sudo systemctl enable --now cloudflared
 ```
 
-If the tunnel was installed as a service with a token, create the config it expects:
+5. Verify it is live: `curl -s https://codesync.yourdomain.com/api/v1/health`
 
-```bash
-sudo mkdir -p ~/.cloudflared
-cat > /tmp/config.yml <<'YAML'
-tunnel: <TUNNEL_ID from: cloudflared tunnel list>
-credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
-ingress:
-  - hostname: codesync.yourdomain.com
-    service: http://127.0.0.1:8000
-  - service: http_status:404
-YAML
-sudo mv /tmp/config.yml /root/.cloudflared/config.yml
-sudo systemctl restart cloudflared
-```
-
-Set `PUBLIC_BASE_URL=https://codesync.yourdomain.com` in `.env`.
+Set `PUBLIC_BASE_URL=https://codesync.yourdomain.com` in `.env` (before
+`docker compose up`, step 5).
 
 > No domain? Free options: [eu.org](https://eu.org) (free subdomain you can put on
-> Cloudflare) or a cheap registrar (~₹100/yr). Otherwise use Option B.
+> Cloudflare; approval can take days) or a cheap registrar (~₹100/yr). Otherwise use
+> Option B.
 
 ### Option B — no domain (quick tunnel)
 
