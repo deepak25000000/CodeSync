@@ -15,7 +15,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app import models  # noqa: F401  (registers metadata)
 from app.config import get_settings
-from app.db import Base
+from app.db import Base, normalize_database_url
 
 config = context.config
 if config.config_file_name is not None:
@@ -27,8 +27,8 @@ target_metadata = Base.metadata
 def _database_url() -> str:
     env_url = os.environ.get("DATABASE_URL")
     if env_url:
-        return env_url
-    return get_settings().database_url
+        return normalize_database_url(env_url)
+    return normalize_database_url(get_settings().database_url)
 
 
 def run_migrations_offline() -> None:
