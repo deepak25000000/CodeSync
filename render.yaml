@@ -1,0 +1,32 @@
+# Render Blueprint — deploy the backend on Render's free tier (no payment
+# method required). See docs/DEPLOYMENT.md, "Option A".
+services:
+  - type: web
+    name: codesync-backend
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      # Set DATABASE_URL in the dashboard to your Neon/Supabase Postgres
+      # connection string (free tier, no card) — SQLite cannot be used on
+      # Render because its free instances have an ephemeral disk.
+      - key: DATABASE_URL
+        sync: false
+      # Random per-deployment encryption key for stored GitHub credentials.
+      # Render generates and stores it; you can also set your own value.
+      - key: CREDENTIALS_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      # Your service's public URL, e.g. https://codesync-xxxx.onrender.com
+      - key: PUBLIC_BASE_URL
+        sync: false
+      # Optional GitHub OAuth application (one-click "Sign in with GitHub").
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: LOG_LEVEL
+        value: INFO

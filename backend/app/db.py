@@ -10,7 +10,22 @@ class Base(DeclarativeBase):
     pass
 
 
+def normalize_database_url(database_url: str) -> str:
+    """Accept the plain ``postgres://`` URLs hosted databases hand out.
+
+    Neon, Supabase and friends return ``postgres://user:pass@host/db?sslmode=…``
+    with no driver in the scheme. SQLAlchemy needs ``postgresql+<driver>://``,
+    so hosted deployments can paste their connection string as-is.
+    """
+    if database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if database_url.startswith("postgresql://"):
+        return database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return database_url
+
+
 def _make_engine(database_url: str) -> Engine:
+    database_url = normalize_database_url(database_url)
     connect_args = {}
     if database_url.startswith("sqlite"):
         # Needed for FastAPI/pytest threads sharing the same in-memory or file DB.
