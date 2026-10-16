@@ -161,6 +161,11 @@ export function detectLanguage(doc, selectors = []) {
       if (canon) return canon;
     }
   }
+  // The editor itself (via the page-world bridge) is the authoritative source
+  // when the DOM hides the language control — e.g. LeetCode renders it in
+  // obfuscated React markup that no selector reliably matches.
+  const bridged = getBridgeLang();
+  if (bridged) return bridged;
   const generic = queryAll(
     doc,
     '[class*="lang"],[class*="Lang"],[id*="lang"],[id*="Lang"],[class*="pill"],[class*="dropdown"],select',
@@ -172,27 +177,81 @@ export function detectLanguage(doc, selectors = []) {
   return null;
 }
 
+// Last-resort language detection from the solution's own syntax, used when
+// neither the DOM nor the editor bridge can report a language. The backend
+// rejects `unknown` with INVALID_FILE, so any confident match here is strictly
+// better than nothing. Every emitted name is a LANG_TOKENS canonical name.
+const SNIFF_RULES = [
+  ['PHP', /<\?php\b/],
+  [
+    'Python3',
+    /(?:^|\n)[ \t]*(?:def\s+\w+\s*\([^)]*\)\s*(?:->[^\n]*)?:|class\s+\w+\s*:(?=\n|$)|from\s+[\w.]+\s+import\s+\w|import\s+(?:numpy|sys|collections|math|typing|re|heapq|itertools|functools)\b)/,
+  ],
+  ['Java', /\bSystem\.out\.print|\bpublic\s+(?:static|class)\b|\bnew\s+(?:ArrayList|HashMap|StringBuilder)</],
+  [
+    'C++',
+    /\busing\s+namespace\s+std\s*;|\bstd::|#include\s*<(?:vector|string|iostream|map|algorithm|set|queue|stack|unordered_map)>/,
+  ],
+  ['C#', /\busing\s+System\s*;|Console\.WriteLine/],
+  ['C', /#include\s*<stdio\.h>|\b(?:int|void)\s+main\s*\(|\bprintf\s*\(/],
+  ['Go', /\bfmt\.(?:Print|Sprintf)|\bpackage\s+main\b/],
+  ['Rust', /\bfn\s+main\s*\(|println!|\blet\s+mut\s+/],
+  ['Kotlin', /(?:^|\n)[ \t]*fun\s+\w+/],
+  ['Swift', /\bfunc\s+\w+\s*\(|import\s+Foundation/],
+  ['TypeScript', /interface\s+\w+\s*\{|:\s*(?:string|number|boolean)\s*[;)=,]/],
+  ['JavaScript', /console\.log\s*\(|=>|\b(?:const|let)\s+\w+\s*=|\bclass\s+\w+\s*\{/],
+  ['Ruby', /(?:^|\n)[ \t]*(?:puts\s|require\s+['"])/],
+  ['Elixir', /\bdefmodule\s+\w+\s+do\b|\bdefp\s+\w+/],
+  ['Erlang', /-module\(|-export\(/],
+  ['Scala', /\bobject\s+\w+\s+extends\b/],
+  ['Dart', /import\s+['"]package:/],
+  ['Bash', /#!\s*\/bin\/(?:ba)?sh|(?:^|\n)[ \t]*echo\s/],
+  ['MySQL', /(?:^|\n)[ \t]*(?:select\b[\s\S]*?\bfrom\b|insert\s+into\b|create\s+table\b)/i],
+];
+
+export function sniffLanguage(code) {
+  if (typeof code !== 'string' || !code.trim()) return null;
+  for (const [name, re] of SNIFF_RULES) {
+    if (re.test(code)) return name;
+  }
+  return null;
+}
+
 function cleanEditorText(text) {
   if (text === null || text === undefined) return null;
   const cleaned = String(text).replace(/[\u200b\u200c\u200d\ufeff]/g, '');
   return cleaned.trim() ? cleaned : null;
 }
 
-// Full text of virtualized editors (Monaco/ACE) captured by the page-world
-// bridge (content/bridge.js). DOM extraction only sees the lines rendered in
-// the viewport, so long solutions would otherwise be truncated silently.
-let bridgeText = { monaco: null, ace: null, at: 0 };
+// Full text (and reported language) of virtualized editors (Monaco/ACE)
+// captured by the page-world bridge (content/bridge.js). DOM extraction only
+// sees the lines rendered in the viewport, so long solutions would otherwise
+// be truncated silently — and some sites (LeetCode) hide the language control
+// entirely, while the editor model still knows the language.
+let bridgeText = { monaco: null, ace: null, monacoLang: null, aceLang: null, at: 0 };
+
+function langOrNull(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
 
 export function setBridgeText(next) {
   bridgeText = {
     monaco: next && next.monaco ? String(next.monaco) : null,
     ace: next && next.ace ? String(next.ace) : null,
+    // Raw editor language ids ("python3", "ace/mode/python" basename …) —
+    // canonicalised on read by getBridgeLang().
+    monacoLang: langOrNull(next && next.monacoLang),
+    aceLang: langOrNull(next && next.aceLang),
     at: (next && next.at) || Date.now(),
   };
 }
 
 export function getBridgeText() {
   return bridgeText;
+}
+
+export function getBridgeLang() {
+  return canonicalLanguage(bridgeText.monacoLang) || canonicalLanguage(bridgeText.aceLang);
 }
 
 export function editorText(el) {

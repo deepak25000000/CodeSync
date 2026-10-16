@@ -1,6 +1,6 @@
 import { VERDICTS } from '../shared/config.js';
 import { stableFingerprint, validateSubmission } from '../shared/schema.js';
-import { detectLanguage } from './shared.js';
+import { detectLanguage, sniffLanguage } from './shared.js';
 import leetcode from './leetcode.js';
 import geeksforgeeks from './geeksforgeeks.js';
 import codechef from './codechef.js';
@@ -50,7 +50,12 @@ export function normalize_submission(adapter, raw) {
 
   const platform = adapter.id;
   const url = typeof meta.url === 'string' && meta.url ? meta.url : null;
-  const language = typeof raw.language === 'string' && raw.language.trim() ? raw.language.trim() : 'unknown';
+  // Language chain: DOM/editor detection first; when a site hides the control
+  // (LeetCode), infer it from the code itself — the backend rejects `unknown`.
+  const detected =
+    typeof raw.language === 'string' && raw.language.trim() ? raw.language.trim() : '';
+  const language =
+    (detected && detected !== 'unknown' ? detected : null) || sniffLanguage(raw.code) || 'unknown';
   const code = typeof raw.code === 'string' ? raw.code : null;
   const verdict = VERDICTS.includes(raw.verdict) ? raw.verdict : 'unknown';
   const external_id = nullableString(raw.external_id, 120);
@@ -90,7 +95,9 @@ export function buildManualSubmission(adapter, doc, url, { now = Date.now(), cod
     metadata,
     verdict: 'manual',
     code: editorCode,
-    language: language || detectLanguage(doc, adapter.languageSelectors || []) || 'unknown',
+    // null (not 'unknown') so normalize_submission can still sniff the
+    // language from the code before giving up.
+    language: language || detectLanguage(doc, adapter.languageSelectors || []),
     external_id: null,
     submitted_at: now,
   });

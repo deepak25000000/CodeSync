@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { editorText, getBridgeText, setBridgeText } from '../../src/adapters/shared.js';
+import { editorText, getBridgeLang, getBridgeText, setBridgeText } from '../../src/adapters/shared.js';
 import { requestBridge } from '../../src/content/bridge.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -53,9 +53,11 @@ describe('bridge text cache (isolated side)', () => {
   });
 
   it('stores empty bridge results as null (falls back to DOM)', () => {
-    setBridgeText({ monaco: '', ace: '', at: Date.now() });
+    setBridgeText({ monaco: '', ace: '', monacoLang: '', aceLang: '', at: Date.now() });
     expect(getBridgeText().monaco).toBeNull();
     expect(getBridgeText().ace).toBeNull();
+    expect(getBridgeText().monacoLang).toBeNull();
+    expect(getBridgeLang()).toBeNull();
     setBridgeText({ monaco: null, ace: null });
     expect(getBridgeText().monaco).toBeNull();
   });
@@ -77,12 +79,16 @@ describe('requestBridge protocol', () => {
           id: posted[0].id,
           monaco: 'full monaco',
           ace: null,
+          monacoLang: 'python3',
+          aceLang: null,
         },
         source: window,
       }),
     );
     await expect(promise).resolves.toBe(true);
     expect(getBridgeText().monaco).toBe('full monaco');
+    expect(getBridgeText().monacoLang).toBe('python3');
+    expect(getBridgeLang()).toBe('Python3');
   });
 
   it('ignores responses with a foreign id', async () => {
@@ -111,14 +117,22 @@ describe('page-world bridge (bridge-main.js)', () => {
     window.monaco = {
       editor: {
         getModels: () => [
-          { getValue: () => '' },
-          { getValue: () => 'def solve():\n    return 42\n# lines past the viewport' },
+          { getValue: () => '', getLanguage: () => 'java' },
+          {
+            getValue: () => 'def solve():\n    return 42\n# lines past the viewport',
+            getLanguage: () => 'python3',
+          },
         ],
       },
     };
     document.body.innerHTML =
       '<div class="ace_editor" id="editor"><div class="ace_content"></div></div>';
-    document.querySelector('#editor').env = { editor: { getValue: () => 'print(1)\nprint(2)' } };
+    document.querySelector('#editor').env = {
+      editor: {
+        getValue: () => 'print(1)\nprint(2)',
+        getSession: () => ({ getMode: () => ({ $id: 'ace/mode/python' }) }),
+      },
+    };
 
     const responsePromise = new Promise((resolve) => {
       window.addEventListener('message', function onMessage(event) {
@@ -142,6 +156,10 @@ describe('page-world bridge (bridge-main.js)', () => {
     expect(response.id).toBe(42);
     expect(response.monaco).toBe('def solve():\n    return 42\n# lines past the viewport');
     expect(response.ace).toBe('print(1)\nprint(2)');
+    // Language rides along with the LONGEST model (the real solution), and the
+    // ACE mode id is reduced to its bare segment.
+    expect(response.monacoLang).toBe('python3');
+    expect(response.aceLang).toBe('python');
     delete window.monaco;
   });
 
@@ -165,5 +183,7 @@ describe('page-world bridge (bridge-main.js)', () => {
     const response = await responsePromise;
     expect(response.monaco).toBeNull();
     expect(response.ace).toBeNull();
+    expect(response.monacoLang).toBeNull();
+    expect(response.aceLang).toBeNull();
   });
 });

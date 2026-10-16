@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
-import { LANG_TOKENS, canonicalLanguage, detectLanguage } from '../../src/adapters/shared.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  LANG_TOKENS,
+  canonicalLanguage,
+  detectLanguage,
+  getBridgeLang,
+  setBridgeText,
+  sniffLanguage,
+} from '../../src/adapters/shared.js';
 
 describe('language canonicalisation contract', () => {
   it('is idempotent for every LANG_TOKENS name', () => {
@@ -65,5 +72,72 @@ describe('language canonicalisation contract', () => {
         <option value="java">Java</option>
       </select>`;
     expect(detectLanguage(document, ['#lang-sel'])).toBe('Python3');
+  });
+});
+
+describe('language fallbacks when the DOM hides the control', () => {
+  afterEach(() => {
+    setBridgeText({ monaco: null, ace: null });
+    document.body.innerHTML = '';
+  });
+
+  it('uses the editor language reported by the page-world bridge', () => {
+    // LeetCode renders the language control in obfuscated React markup, but
+    // the Monaco model (reachable only via the MAIN-world bridge) knows it.
+    setBridgeText({ monaco: 'x = 1', monacoLang: 'python3', at: Date.now() });
+    expect(getBridgeLang()).toBe('Python3');
+    document.body.innerHTML = '<div class="no-lang-here">Python3 hidden</div>';
+    expect(detectLanguage(document, ['#missing'])).toBe('Python3');
+
+    setBridgeText({ ace: 'x = 1', aceLang: 'cpp', at: Date.now() });
+    expect(detectLanguage(document, ['#missing'])).toBe('C++');
+  });
+
+  it('canonicalises bridge language ids and ignores unmapped ones', () => {
+    // 'plaintext' maps to a real backend language (txt files)…
+    setBridgeText({ monaco: 'x = 1', monacoLang: 'plaintext', at: Date.now() });
+    expect(getBridgeLang()).toBe('Plain Text');
+    // …while ids with no canonical mapping fall through instead of guessing.
+    setBridgeText({ monaco: 'x = 1', monacoLang: 'pandas', at: Date.now() });
+    expect(getBridgeLang()).toBeNull();
+    document.body.innerHTML = '';
+    expect(detectLanguage(document, ['#missing'])).toBeNull();
+  });
+
+  it('sniffs every supported language from the code itself', () => {
+    const cases = [
+      ['class Solution:\n    def f(self):\n        return 1', 'Python3'],
+      ['public class Main {\n  public static void main(String[] a) {\n    System.out.println(1);\n  }\n}', 'Java'],
+      ['#include <vector>\nusing namespace std;', 'C++'],
+      ['using System;\nclass P { static void Main() { Console.WriteLine(1); } }', 'C#'],
+      ['#include <stdio.h>\nint main() { printf("hi"); return 0; }', 'C'],
+      ['package main\nimport "fmt"\nfunc main() { fmt.Println(1) }', 'Go'],
+      ['fn main() { println!("hi"); }', 'Rust'],
+      ['fun main() { println("hi") }', 'Kotlin'],
+      ['func greet() { print("hi") }', 'Swift'],
+      ['interface Node { value: number }', 'TypeScript'],
+      ['const x = 1;\nconsole.log(x);', 'JavaScript'],
+      ['puts "hi"\n', 'Ruby'],
+      ['defmodule Foo do\nend', 'Elixir'],
+      ['-module(foo).\n-export([bar/0]).', 'Erlang'],
+      ['object Main extends App', 'Scala'],
+      ["import 'package:flutter/material.dart';", 'Dart'],
+      ['#!/bin/bash\necho hi', 'Bash'],
+      ['SELECT id FROM users WHERE active = 1;', 'MySQL'],
+      ['<?php echo 1;', 'PHP'],
+    ];
+    for (const [code, expected] of cases) {
+      expect(sniffLanguage(code), code).toBe(expected);
+      // Sniffed names must round-trip canonicalisation (backend contract).
+      expect(canonicalLanguage(expected), expected).toBe(expected);
+    }
+  });
+
+  it('returns null for empty or unrecognisable code', () => {
+    expect(sniffLanguage('')).toBeNull();
+    expect(sniffLanguage('   \n  ')).toBeNull();
+    expect(sniffLanguage(null)).toBeNull();
+    expect(sniffLanguage(undefined)).toBeNull();
+    expect(sniffLanguage('12345 + 67890')).toBeNull();
   });
 });

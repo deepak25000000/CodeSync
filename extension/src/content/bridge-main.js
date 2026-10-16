@@ -6,19 +6,18 @@
 // reading `.view-line` / `.ace_line` from the isolated content script silently
 // truncates solutions that are taller than the editor. The editor instances
 // are only reachable where the page's own JavaScript lives, so this script
-// reads the full model text and answers requests over window.postMessage.
+// reads the full model text — and the model's language id, which tracks the
+// language dropdown even when the control itself is hidden behind obfuscated
+// React markup — and answers requests over window.postMessage.
 //
 // Failure modes degrade safely: if the page's CSP blocks MAIN-world scripts
 // (page CSP applies to this world), this file never runs and the content
 // script simply keeps using DOM extraction.
 const SOURCE = 'codesync-bridge';
 
-function longestText(values) {
-  let best = null;
-  for (const text of values) {
-    if (typeof text === 'string' && text.trim() && (!best || text.length > best.length)) {
-      best = text;
-    }
+function keepBest(best, text, lang) {
+  if (typeof text === 'string' && text.trim() && (!best || text.length > best.text.length)) {
+    return { text, lang: lang || null };
   }
   return best;
 }
@@ -27,7 +26,14 @@ function readMonaco() {
   const models = (window.monaco && window.monaco.editor && window.monaco.editor.getModels) || null;
   if (typeof models !== 'function') return null;
   try {
-    return longestText(models().map((model) => (model && model.getValue && model.getValue()) || ''));
+    let best = null;
+    for (const model of models()) {
+      const text = (model && model.getValue && model.getValue()) || '';
+      // e.g. "python3", "java", "cpp", "golang" — set from the dropdown.
+      const lang = (model && model.getLanguage && model.getLanguage()) || null;
+      best = keepBest(best, text, lang);
+    }
+    return best;
   } catch (_err) {
     return null;
   }
@@ -46,20 +52,31 @@ function aceInstance(root) {
   return null;
 }
 
+function aceModeLang(editor) {
+  // Mode id looks like "ace/mode/python"; the last segment is enough.
+  try {
+    const session = editor.getSession && editor.getSession();
+    const mode = session && session.getMode && session.getMode();
+    const id = mode && mode.$id;
+    return typeof id === 'string' && id ? id.split('/').pop() : null;
+  } catch (_err) {
+    return null;
+  }
+}
+
 function readAce() {
   const roots = document.querySelectorAll('.ace_editor');
-  const texts = [];
+  let best = null;
   for (const root of roots) {
     const editor = aceInstance(root);
-    if (editor) {
-      try {
-        texts.push(editor.getValue());
-      } catch (_err) {
-        /* ignore broken instance */
-      }
+    if (!editor) continue;
+    try {
+      best = keepBest(best, editor.getValue(), aceModeLang(editor));
+    } catch (_err) {
+      /* ignore broken instance */
     }
   }
-  return longestText(texts);
+  return best;
 }
 
 window.addEventListener('message', (event) => {
@@ -68,17 +85,28 @@ window.addEventListener('message', (event) => {
   if (!data || data.source !== SOURCE || data.type !== 'request') return;
   let monaco = null;
   let ace = null;
+  let monacoLang = null;
+  let aceLang = null;
   try {
-    monaco = readMonaco();
+    const m = readMonaco();
+    monaco = m ? m.text : null;
+    monacoLang = m ? m.lang : null;
   } catch (_err) {
     monaco = null;
+    monacoLang = null;
   }
   try {
-    ace = readAce();
+    const a = readAce();
+    ace = a ? a.text : null;
+    aceLang = a ? a.lang : null;
   } catch (_err) {
     ace = null;
+    aceLang = null;
   }
-  window.postMessage({ source: SOURCE, type: 'response', id: data.id, monaco, ace }, '*');
+  window.postMessage(
+    { source: SOURCE, type: 'response', id: data.id, monaco, ace, monacoLang, aceLang },
+    '*'
+  );
 });
 
 window.postMessage({ source: SOURCE, type: 'ready' }, '*');

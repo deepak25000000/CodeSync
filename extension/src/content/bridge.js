@@ -22,8 +22,14 @@ window.addEventListener('message', (event) => {
   if (data.type === 'response') {
     const done = pending.get(data.id);
     if (done) {
-      // Only correlate text with requests this script actually issued.
-      setBridgeText({ monaco: data.monaco, ace: data.ace, at: Date.now() });
+      // Only correlate text/lang with requests this script actually issued.
+      setBridgeText({
+        monaco: data.monaco,
+        ace: data.ace,
+        monacoLang: data.monacoLang,
+        aceLang: data.aceLang,
+        at: Date.now(),
+      });
       pending.delete(data.id);
       done(true);
     }

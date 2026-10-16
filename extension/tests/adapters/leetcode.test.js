@@ -66,6 +66,31 @@ describe('leetcode adapter', () => {
     );
   });
 
+  it('detects language from the live UI language control', () => {
+    // The live LeetCode UI has no legacy .lang-select/data-cy markup; the
+    // control is located via its e2e locator/aria-label instead.
+    const doc = fixtureDoc('leetcode/live.html');
+    const url = 'https://leetcode.com/problems/longest-common-prefix/';
+    const raw = leetcode.detect_submission(doc, url);
+    expect(raw.language).toBe('Python3');
+    const submission = normalize_submission(leetcode, raw);
+    expect(submission).toMatchObject({
+      title: 'Longest Common Prefix',
+      problem_id: 'longest-common-prefix',
+      language: 'Python3',
+      verdict: 'unknown',
+    });
+  });
+
+  it('sniffs the language from the code when no control exists at all', () => {
+    const doc = fixtureDoc('leetcode/live.html');
+    doc.querySelector('[data-e2e-locator]').remove();
+    const url = 'https://leetcode.com/problems/longest-common-prefix/';
+    const raw = leetcode.detect_submission(doc, url);
+    expect(raw.language).toBeNull();
+    expect(normalize_submission(leetcode, raw).language).toBe('Python3');
+  });
+
   it('extracts a rejected submission', () => {
     const doc = fixtureDoc('leetcode/rejected.html');
     expect(leetcode.extractSubmissionStatus(doc)).toBe('rejected');

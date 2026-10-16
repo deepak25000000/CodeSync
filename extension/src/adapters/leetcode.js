@@ -38,6 +38,10 @@ const LANGUAGE_SELECTORS = [
   'select[name="language"]',
   '[class*="lang-select"]',
   '[class*="language-select"]',
+  // Live LeetCode UI: React-rendered control without legacy class names.
+  '[data-e2e-locator*="lang" i]',
+  '#lang-select',
+  '[aria-label*="language" i]',
 ];
 
 const TITLE_SELECTORS = [
