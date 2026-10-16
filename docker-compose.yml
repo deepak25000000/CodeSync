@@ -2,22 +2,29 @@ services:
   backend:
     build: .
     ports:
-      - "8000:8000"
+      # Bound to localhost on purpose: reach the API through a tunnel
+      # (Cloudflare Tunnel / Caddy), not directly from the internet.
+      # For direct LAN access change to "8000:8000".
+      - "127.0.0.1:8000:8000"
     environment:
       # REQUIRED — generate one with:
-      #   python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())"
+      #   python3 -c "import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
       CREDENTIALS_KEY: ${CREDENTIALS_KEY:?set CREDENTIALS_KEY in your environment or .env}
       DATABASE_URL: sqlite:////data/codesync.db
       ENVIRONMENT: production
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:8000}
-      # Optional GitHub OAuth application
+      # Optional GitHub OAuth application (enables one-click extension sign-in)
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       RATE_LIMIT_ENABLED: "true"
       LOG_LEVEL: INFO
     volumes:
-      - codesync-data:/data
+      # Persistent state (SQLite) — survives rebuilds, easy to back up:
+      #   tar czf codesync-backup.tgz data/
+      - ./data:/data
     restart: unless-stopped
-
-volumes:
-  codesync-data:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,15 +1,15 @@
 # CodeSync
 
-Automatically push your accepted coding solutions from **LeetCode**, **GeeksforGeeks** and
-**CodeChef** into your own GitHub repository — with a Chrome extension that watches for
-submissions and a FastAPI backend that owns the GitHub credentials, deduplication and
-retry logic. **NeetCode** is supported as a metadata/manual-sync companion (it is a
+Automatically push your accepted coding solutions from **LeetCode**, **GeeksforGeeks**
+and **CodeChef** into your own GitHub repository — with a Chrome extension that watches
+for submissions and a FastAPI backend that owns the GitHub credentials, deduplication
+and retry logic. **NeetCode** is supported as a manual-sync companion (it is a
 practice organizer, not a judge — see [docs/CAPABILITY_MATRIX.md](docs/CAPABILITY_MATRIX.md)).
 
 ```
 Chrome extension (MV3)                     FastAPI backend                      GitHub
 ┌──────────────────────────┐   HTTPS/JSON   ┌─────────────────────────┐   REST   ┌─────────┐
-│ content adapters         │ ─────────────▶ │ auth (OAuth / PAT)      │ ───────▶ │         │
+│ content adapters         │ ─────────────▶ │ auth (OAuth one-click)  │ ───────▶ │         │
 │ background queue+retry   │  Bearer token  │ idempotent submissions  │  Contents│ your    │
 │ popup / options UI       │                │ sync worker + scheduler │   API    │ repo    │
 └──────────────────────────┘                │ encrypted credentials   │          │ (DSA-   │
@@ -18,6 +18,9 @@ Chrome extension (MV3)                     FastAPI backend                      
 
 Key properties:
 
+* **One-click setup for users.** Install the extension, press *Sign in with GitHub*,
+  pick a repository — done. No token to copy, ever (the API token is issued by the
+  backend and stored in the extension automatically).
 * **The extension never sees a GitHub token.** Credentials live only on the server,
   encrypted at rest with Fernet (`CREDENTIALS_KEY`).
 * **Exactly-once semantics.** Submissions are fingerprinted (`platform + submission id`,
@@ -27,22 +30,81 @@ Key properties:
 * **Durable retries.** Jobs run through `QUEUED → SYNCING → SYNCED` with bounded
   exponential backoff + jitter, rate-limit awareness and a full per-attempt audit log.
 * **Language-accurate files.** The extension detects the language you actually
-  submitted in (25+ languages: Python/Python3, C++, Java, JavaScript, TypeScript,
-  Go, Rust, Kotlin, Swift, C#, Ruby, PHP, Scala, Dart, Elixir, Erlang, R, Bash,
-  SQL dialects, …) and the backend maps it to the matching file extension — a
-  contract test parses the extension's language table so the two can never drift.
+  submitted in (25+ languages) via the DOM, the editor bridge *or* the code itself,
+  and the backend maps it to the matching file extension — with a contract test that
+  parses the extension's language table so the two can never drift.
 
-## Repository layout
+---
 
-```
-backend/            FastAPI app (app/api, app/services), alembic migrations, pytest suite
-extension/          Chrome MV3 extension (esbuild + vitest), adapters per platform
-docs/               Audit, implementation plan, API reference, security, acceptance tests
-.github/workflows/  CI (backend pytest/ruff/mypy + extension vitest/build)
-Dockerfile, docker-compose.yml
-```
+## Using the extension (user guide)
 
-## Quickstart — backend
+### 1 · Install
+
+1. Grab `extension/release/codesync-extension-vX.Y.Z.zip` from this repository and
+   extract it anywhere (keep the folder — Chrome loads from it).
+2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked** and
+   select the extracted folder. Pin the CodeSync icon.
+
+### 2 · Connect (Options page)
+
+Right-click the extension icon → **Options**, then under **Connection**:
+
+1. **API base URL** — leave `http://127.0.0.1:8000` if the backend runs on your
+   machine, or enter your hosted URL (e.g. `https://codesync.yourdomain.com`). For a
+   remote URL the browser asks for host permission once — allow it.
+2. Press **Sign in with GitHub**. A GitHub window opens; authorize, and the backend
+   issues your API token which is stored in the extension automatically.
+   *Backend without an OAuth app?* Open *"Connect with a GitHub PAT instead"* and
+   paste a GitHub PAT (`repo` scope) — same one-step result.
+   *Advanced:* a token copied from the backend portal can still be pasted into the
+   **API token** field manually.
+
+### 3 · Choose the repository
+
+Still in Options, under **Repository**:
+
+* Pick an existing repository from the dropdown, **or create one** right there
+  (name + optional private checkbox).
+* Set **Branch** (default `main`) and **Root folder** (default `DSA-Solutions`).
+* Toggle the platforms you use, leave **Auto-sync** on, press **Save settings**.
+
+### 4 · Solve — and forget about it
+
+Submit a solution as usual on LeetCode / GeeksforGeeks / CodeChef. When the verdict
+appears, the extension detects it (title, verdict, full code, language), and within
+seconds your repo gets:
+
+* `…/LeetCode/0001-two-sum.py` — the solution, in the language you submitted,
+  with a provenance header (platform, problem, verdict, submission id, fingerprint)
+* `…/progress.json` — machine-readable progress
+* `…/README.md` — a human-readable progress table
+
+Verdicts that trigger a sync: LeetCode **Accepted**, GeeksforGeeks **Problem Solved
+Successfully**, CodeChef **Correct**. Rejected/pending attempts are never pushed.
+
+**Manual sync** — anything the detector can't catch (or NeetCode lists): open the
+problem page, click the extension icon → **Sync this page**, or use **Manual
+submission** in Options. The popup's **Queue** shows every job with its state,
+error code and a **Retry** button.
+
+---
+
+## Hosting the backend — production-ready, free for life
+
+The backend needs somewhere to run. For a personal deployment the best zero-cost
+option is an **Oracle Cloud Always Free VM** (a real server you keep forever, no
+charges) + Docker + a free Cloudflare Tunnel for HTTPS:
+
+* **Full step-by-step guide: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** —
+  VM creation → Docker → tunnel → GitHub OAuth app → `docker compose up -d --build`.
+* After deploying, users just set the **API base URL** in the extension options and
+  press **Sign in with GitHub** — no other configuration anywhere.
+* Backups are one tarred folder (`./data`); updates are `git pull && docker compose
+  up -d --build`.
+
+---
+
+## Quickstart — backend (development)
 
 ```bash
 cd backend
@@ -57,7 +119,8 @@ uvicorn app.main:app --reload --port 8000
 
 Open <http://127.0.0.1:8000> — the portal walks you through connecting GitHub
 (OAuth app or personal access token with the `repo` scope) and hands you a **one-time
-API token** for the extension. Interactive API docs are at `/docs`.
+API token** for the extension (optional now — the extension can sign in by itself).
+Interactive API docs are at `/docs`.
 
 Prefer containers?
 
@@ -66,22 +129,16 @@ export CREDENTIALS_KEY=$(python -c "from cryptography.fernet import Fernet;print
 docker compose up --build
 ```
 
-## Quickstart — extension
+## Quickstart — extension (contributors)
 
 **Install from a release (no Node.js needed):**
 
-1. Grab `extension/release/codesync-extension-vX.Y.Z.zip` from this repository,
-   extract it into any folder (keep it somewhere stable).
+1. Grab `extension/release/codesync-extension-vX.Y.Z.zip`, extract it into any folder.
 2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**,
-   and select the extracted folder.
-3. Open the extension **Options** and follow the **First-time setup** card: set the
-   API base URL (`http://127.0.0.1:8000`), paste the API token from the portal, pick
-   a repository (or create one), enable the platforms you use, save.
-4. Solve and submit a problem on LeetCode / GeeksforGeeks / CodeChef — the solution
-   file (in the language you submitted), `progress.json` and a progress README
-   section land in your repo automatically.
+   select the extracted folder.
+3. Follow **Using the extension** above.
 
-**Build from source (contributors):**
+**Build from source:**
 
 ```bash
 cd extension
@@ -97,10 +154,10 @@ card in `chrome://extensions` — `dist/` is a build artifact and is never commi
 ## Testing
 
 ```bash
-# backend — 148 tests: unit + API integration + E2E against a mocked GitHub
+# backend — 204 tests: unit + API integration + E2E against a mocked GitHub
 cd backend && pytest
 
-# extension — 134 tests: adapter fixtures, language contract, bridge, queue/backoff, manifest
+# extension — 147 tests: adapter fixtures, language contract, bridge, auth, queue/backoff, manifest
 cd extension && npm test
 ```
 
@@ -110,6 +167,8 @@ Both suites are fully deterministic: no network, no live sites, no real GitHub.
 
 * API tokens are stored as SHA-256 hashes only; plaintext is shown exactly once.
 * GitHub tokens are encrypted server-side (Fernet) and never leave the backend.
+* One-click sign-in redirects are locked to `https://<extension-id>.chromiumapp.org/`
+  — the OAuth callback can never be used as an open redirector.
 * Strict input validation (Pydantic), per-token sliding-window rate limits, request
   size caps, CSP-clean extension (no remote code, no inline scripts), host allowlists,
   recursive log redaction.
@@ -120,6 +179,7 @@ Full details: [docs/SECURITY.md](docs/SECURITY.md).
 
 | Document | Contents |
 |---|---|
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Free-forever production hosting (VM + Docker + tunnel) |
 | [docs/API.md](docs/API.md) | Endpoint reference, payloads, error model |
 | [docs/CAPABILITY_MATRIX.md](docs/CAPABILITY_MATRIX.md) | What each platform adapter can and cannot do |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model and controls |
@@ -129,3 +189,5 @@ Full details: [docs/SECURITY.md](docs/SECURITY.md).
 | [docs/STORE_LISTING.md](docs/STORE_LISTING.md) | Chrome Web Store submission package |
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Phase plan |
 | [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md) | Delivery report, test results, known limits |
+
+MIT © Deepak Thorat.
