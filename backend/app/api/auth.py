@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import html
+import json
 import logging
+import re
 from datetime import UTC, datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -34,6 +38,31 @@ logger = logging.getLogger("codesync.api.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 STATE_COOKIE = "codesync_oauth_state"
+EXT_COOKIE = "codesync_oauth_ext"
+
+# Chrome's identity redirect for extension sign-in flows:
+#   https://<32-char-extension-id>.chromiumapp.org/
+# Accepting ONLY this shape keeps the OAuth callback from becoming an open
+# redirector that could leak freshly issued API tokens to arbitrary sites.
+EXTENSION_REDIRECT_RE = re.compile(r"^https://[a-z0-9]{32}\.chromiumapp\.org/?$", re.IGNORECASE)
+
+
+def _encode_ext_cookie(redirect_uri: str) -> str:
+    payload = json.dumps({"u": redirect_uri}).encode()
+    return base64.urlsafe_b64encode(payload).decode()
+
+
+def _decode_ext_cookie(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        data = json.loads(base64.urlsafe_b64decode(value.encode()).decode())
+        uri = data.get("u")
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(uri, str) or not EXTENSION_REDIRECT_RE.match(uri):
+        return None
+    return uri
 
 
 def _client_key(request: Request) -> str:
@@ -97,7 +126,10 @@ async def connect_with_pat(
 
 @router.get("/github/start")
 async def github_oauth_start(
-    request: Request, settings: Settings = Depends(get_app_settings)
+    request: Request,
+    client: str | None = None,
+    redirect_uri: str | None = None,
+    settings: Settings = Depends(get_app_settings),
 ) -> RedirectResponse:
     if not settings.oauth_enabled:
         raise HTTPException(
@@ -108,6 +140,18 @@ async def github_oauth_start(
             },
         )
     _rate_check(request, settings, "oauth-start")
+    # One-click extension sign-in: the extension launches this URL through
+    # chrome.identity and must receive the issued token back on its own
+    # chromiumapp.org redirect — validate it strictly before agreeing.
+    is_extension = client == "extension"
+    if is_extension and (not redirect_uri or not EXTENSION_REDIRECT_RE.match(redirect_uri)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_REDIRECT_URI",
+                "message": "redirect_uri must be https://<extension-id>.chromiumapp.org/.",
+            },
+        )
     import secrets
 
     state = secrets.token_urlsafe(24)
@@ -122,6 +166,15 @@ async def github_oauth_start(
         samesite="lax",
         secure=settings.public_base_url.startswith("https://"),
     )
+    if is_extension and redirect_uri:
+        response.set_cookie(
+            EXT_COOKIE,
+            _encode_ext_cookie(redirect_uri),
+            max_age=600,
+            httponly=True,
+            samesite="lax",
+            secure=settings.public_base_url.startswith("https://"),
+        )
     return response
 
 
@@ -133,7 +186,7 @@ async def github_oauth_callback(
     error: str | None = None,
     session: Session = Depends(get_db_session),
     settings: Settings = Depends(get_app_settings),
-) -> HTMLResponse:
+) -> Response:
     if error or not code:
         return _portal_result(False, f"GitHub sign-in failed: {error or 'missing code'}")
     cookie_state = request.cookies.get(STATE_COOKIE)
@@ -161,6 +214,20 @@ async def github_oauth_callback(
 
     plaintext = issue_api_token(session, user, name="oauth")
     log_event(logger, "oauth_connected", user_id=user.id, github_login=user.github_login)
+
+    # Extension client (chrome.identity launchWebAuthFlow): hand the token
+    # straight back on the browser callback Chrome provided — the page is
+    # never rendered, so the user never sees or copies anything.
+    ext_redirect = _decode_ext_cookie(request.cookies.get(EXT_COOKIE))
+    if ext_redirect:
+        log_event(logger, "oauth_connected_ext", user_id=user.id, github_login=user.github_login)
+        ext_response = RedirectResponse(
+            f"{ext_redirect}?token={quote(plaintext, safe='')}", status_code=302
+        )
+        ext_response.delete_cookie(STATE_COOKIE)
+        ext_response.delete_cookie(EXT_COOKIE)
+        return ext_response
+
     response = _portal_result(True, None, token=plaintext, login=user.github_login)
     response.delete_cookie(STATE_COOKIE)
     return response
@@ -269,7 +336,7 @@ code{{display:block;background:#f4f4f5;padding:12px;border-radius:8px;word-break
 .btn{{display:inline-block;background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none}}
 .warn{{background:#fff7ed;border:1px solid #fdba74;padding:10px;border-radius:8px}}</style></head>
 <body><h1>Connected as <code style="display:inline;background:none;padding:0">{html.escape(login or "")}</code></h1>
-<p class="warn">Copy this API token now — it is shown only once. Paste it into the CodeSync extension options page.</p>
+<p class="warn">Copy this API token now — it is shown only once. Paste it into the CodeSync extension options page, or skip copying entirely by pressing <em>Sign in with GitHub</em> there.</p>
 <code id="token">{html.escape(token)}</code>
 <p><button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('token').textContent)">Copy token</button></p>
 <p>Then close this tab and return to the extension.</p></body></html>"""

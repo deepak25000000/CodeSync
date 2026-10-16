@@ -133,6 +133,67 @@ class TestOAuthFlow:
             resp = client.get("/api/v1/auth/github/callback", params={"error": "access_denied"})
             assert resp.status_code == 400
 
+    # --- one-click extension sign-in (chrome.identity redirect) ---------------
+
+    EXT_REDIRECT = "https://" + "a" * 32 + ".chromiumapp.org/"
+
+    def test_extension_start_rejects_foreign_redirect_uri(self, tmp_path, fake_github):
+        app = self._app_with_oauth(tmp_path, fake_github)
+        with TestClient(app, follow_redirects=False) as client:
+            resp = client.get(
+                "/api/v1/auth/github/start",
+                params={"client": "extension", "redirect_uri": "https://evil.example/"},
+            )
+            assert resp.status_code == 400
+            assert resp.json()["detail"]["code"] == "INVALID_REDIRECT_URI"
+
+    def test_extension_callback_redirects_token_to_chromiumapp(self, tmp_path, fake_github):
+        app = self._app_with_oauth(tmp_path, fake_github)
+        with TestClient(app, follow_redirects=False) as client:
+            start = client.get(
+                "/api/v1/auth/github/start",
+                params={"client": "extension", "redirect_uri": self.EXT_REDIRECT},
+            )
+            assert start.status_code == 302
+            state = start.headers["location"].split("state=")[1].split("&")[0]
+            resp = client.get(
+                "/api/v1/auth/github/callback", params={"code": "good", "state": state}
+            )
+            assert resp.status_code == 302
+            location = resp.headers["location"]
+            assert location.startswith(self.EXT_REDIRECT)
+            assert "token=cs_" in location
+
+    def test_extension_redirect_never_leaks_token_on_forged_cookie(self, tmp_path, fake_github):
+        from app.api.auth import _encode_ext_cookie
+
+        app = self._app_with_oauth(tmp_path, fake_github)
+        with TestClient(app, follow_redirects=False) as client:
+            client.cookies.set(
+                "codesync_oauth_ext",
+                _encode_ext_cookie("https://evil.example/"),
+                domain="testserver",
+            )
+            start = client.get("/api/v1/auth/github/start")
+            state = start.headers["location"].split("state=")[1].split("&")[0]
+            resp = client.get(
+                "/api/v1/auth/github/callback", params={"code": "good", "state": state}
+            )
+            # Tampered/foreign redirect falls back to the portal page — the
+            # token is never redirected anywhere unvalidated.
+            assert resp.status_code == 200
+            assert "cs_" in resp.text
+
+    def test_ext_cookie_decoding_is_strict(self):
+        from app.api.auth import _decode_ext_cookie, _encode_ext_cookie
+
+        assert _decode_ext_cookie(None) is None
+        assert _decode_ext_cookie("") is None
+        assert _decode_ext_cookie("not-base64!!") is None
+        assert _decode_ext_cookie(_encode_ext_cookie("https://evil.example/")) is None
+        uri = "https://" + "b" * 32 + ".chromiumapp.org/"
+        assert _decode_ext_cookie(_encode_ext_cookie(uri)) == uri
+
 
 class TestTokenManagement:
     def test_mint_rotate(self, client: TestClient, auth_headers: dict):

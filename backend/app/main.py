@@ -187,7 +187,7 @@ ul{{padding-left:18px}} li{{margin:3px 0;color:var(--mut);font-size:14px}}
 <div class="card">
  <h2 style="margin-top:0">3 · Install the extension</h2>
  <div class="step"><b>a.</b><span>Run <code>npm run build</code> in <code>extension/</code>, then load <code>extension/dist</code> via <code>chrome://extensions → Load unpacked</code>.</span></div>
- <div class="step"><b>b.</b><span>Open the extension Options, set API base URL (<code>{html.escape(settings.public_base_url)}</code>) and paste the API token.</span></div>
+ <div class="step"><b>b.</b><span>Open the extension Options, set the API base URL (<code>{html.escape(settings.public_base_url)}</code>) and press <em>Sign in with GitHub</em> — the API token is issued automatically (no copying needed).</span></div>
  <div class="step"><b>c.</b><span>Pick a repository, then submit a problem — the solution lands in your repo automatically.</span></div>
 </div>
 
