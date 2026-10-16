@@ -85,6 +85,22 @@ class TestHappyPath:
             "octo/dsa", "DSA-Solutions/LeetCode/0002-add-two-numbers.py", "main"
         )
 
+    def test_unknown_language_is_repaired_from_code_and_syncs(
+        self, client: TestClient, auth_headers: dict, app, fake_github
+    ):
+        # Extension-side detection failed (site redesign hid the language
+        # control): the backend must infer the language from the code and sync,
+        # instead of failing forever with INVALID_FILE.
+        _connect_and_configure(client, auth_headers)
+        client.post("/api/v1/submissions", json=make_body(language="unknown"), headers=auth_headers)
+        assert drain(app) == 1
+
+        job = client.get("/api/v1/sync", headers=auth_headers).json()["items"][0]
+        assert job["state"] == "SYNCED"
+        assert job["file_path"] == "DSA-Solutions/LeetCode/0001-two-sum.py"
+        stored = client.get("/api/v1/submissions", headers=auth_headers).json()["items"][0]
+        assert stored["language"] == "Python3"  # repair persisted to the row
+
 
 class TestFailurePaths:
     def test_no_repository_fails_permanently(

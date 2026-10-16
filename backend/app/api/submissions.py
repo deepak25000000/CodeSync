@@ -57,6 +57,36 @@ def _platform_enabled(session: Session, user_id: int, platform: str) -> bool:
     return True if row is None else bool(row.enabled)
 
 
+def _is_stuck_invalid_file(job: SyncJob) -> bool:
+    return job.state == JobState.failed.value and job.error_code == "INVALID_FILE"
+
+
+def _repair_unknown_language(existing: Submission, body: SubmissionCreateIn) -> bool:
+    """A duplicate replay that now carries a KNOWN language heals an `unknown` row.
+
+    Id-based fingerprints deliberately ignore language and code, so replaying a
+    submission after detection improved would otherwise keep returning the old
+    `unknown` row — and its permanently failed job — forever. Only ever flips
+    rows whose stored language is missing/`unknown`; everything else is left
+    untouched (dedupe semantics stay exactly as documented).
+    """
+    language = (body.language or "").strip()
+    if not language or language.lower() == "unknown":
+        return False
+    if (existing.language or "").strip().lower() not in ("", "unknown"):
+        return False
+    if not existing.code and not body.code:
+        return False
+    existing.language = language
+    if not existing.code and body.code:
+        existing.code = body.code
+        existing.content_hash = content_hash(body.code)
+    existing.fingerprint = stable_fingerprint(
+        existing.platform, existing.external_id, existing.url, language, existing.code
+    )
+    return True
+
+
 @router.post(
     "/submissions", response_model=SubmissionCreateOut, status_code=status.HTTP_201_CREATED
 )
@@ -83,9 +113,26 @@ def create_submission(
         )
     ).scalar_one_or_none()
     if existing is not None:
+        repaired = _repair_unknown_language(existing, body)
         job = session.execute(
             select(SyncJob).where(SyncJob.submission_id == existing.id)
         ).scalar_one_or_none()
+        if repaired and job is not None and _is_stuck_invalid_file(job):
+            # The row now has a usable language; give the permanently failed
+            # job a fresh chance instead of returning it as-is forever.
+            job.state = JobState.queued.value
+            job.error_code = None
+            job.last_error = None
+            job.attempts = 0
+            job.next_attempt_at = None
+            job.completed_at = None
+            log_event(
+                logger,
+                "submission_language_repaired",
+                job_id=job.id,
+                submission_id=existing.id,
+                language=existing.language,
+            )
         return SubmissionCreateOut(
             submission=SubmissionOut.from_model(existing),
             duplicate=True,

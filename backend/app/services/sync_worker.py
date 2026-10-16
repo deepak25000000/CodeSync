@@ -35,8 +35,9 @@ from app.services.filegen import (
     header_problem_id,
     update_readme,
 )
-from app.services.fingerprint import find_marker
+from app.services.fingerprint import find_marker, stable_fingerprint
 from app.services.github import GitHubClient, b64decode
+from app.services.language_detect import sniff_language
 
 logger = logging.getLogger("codesync.sync")
 
@@ -183,6 +184,23 @@ class SyncWorker:
             )
 
         language = submission.language
+        if (not language or language.strip().lower() == "unknown") and submission.code:
+            # Safety net: the extension could not detect the language (e.g. a
+            # site redesign hid its language control). Infer it from the code
+            # and persist the repair so the file header, dedupe fingerprint and
+            # any later retry all agree — instead of failing forever with
+            # INVALID_FILE on an otherwise perfect submission.
+            sniffed = sniff_language(submission.code)
+            if sniffed:
+                submission.language = sniffed
+                submission.fingerprint = stable_fingerprint(
+                    submission.platform,
+                    submission.external_id,
+                    submission.url,
+                    sniffed,
+                    submission.code,
+                )
+                language = sniffed
         try:
             path = build_repo_path(
                 settings_row,

@@ -97,6 +97,49 @@ class TestCreateSubmission:
         assert body["submission"]["status"] == "VALIDATED"
         assert body["sync_job_id"] is not None
 
+    def test_duplicate_with_known_language_repairs_unknown_and_requeues(
+        self, client: TestClient, auth_headers: dict, app, fake_github
+    ):
+        from sqlalchemy import select
+
+        from app.models import JobState, Submission, SyncJob
+        from tests.conftest import drain
+
+        client.patch("/api/v1/settings", json={"repo_full_name": "octo/dsa"}, headers=auth_headers)
+        first = client.post(
+            "/api/v1/submissions",
+            json=make_body(external_id="LC-REPAIR", language="unknown"),
+            headers=auth_headers,
+        ).json()
+        # Recreate the historical stuck state: unknown language and a job that
+        # died permanently on INVALID_FILE (id-based fingerprints ignore
+        # language, so replays kept hitting this same row).
+        with app.state.db.session() as session:
+            submission = session.get(Submission, first["submission"]["id"])
+            assert submission is not None
+            submission.language = "unknown"
+            job = session.execute(
+                select(SyncJob).where(SyncJob.submission_id == submission.id)
+            ).scalar_one()
+            job.state = JobState.failed.value
+            job.error_code = "INVALID_FILE"
+            job.last_error = "Unsupported programming language: 'unknown'"
+
+        # Replaying the same submission id now carrying a known language must
+        # heal the row and give the job a fresh chance — not return it as-is.
+        second = client.post(
+            "/api/v1/submissions",
+            json=make_body(external_id="LC-REPAIR", language="Python3"),
+            headers=auth_headers,
+        ).json()
+        assert second["duplicate"] is True
+        assert second["submission"]["language"] == "Python3"
+        assert second["sync_job_id"] == first["sync_job_id"]
+
+        assert drain(app) == 1
+        job_out = client.get(f"/api/v1/sync/{second['sync_job_id']}", headers=auth_headers).json()
+        assert job_out["state"] == "SYNCED"
+
     def test_auto_sync_off_suppresses_job(self, client: TestClient, auth_headers: dict):
         client.patch("/api/v1/settings", json={"auto_sync": False}, headers=auth_headers)
         body = client.post("/api/v1/submissions", json=make_body(), headers=auth_headers).json()
