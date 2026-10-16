@@ -91,16 +91,19 @@ error code and a **Retry** button.
 
 ## Hosting the backend — production-ready, free for life
 
-The backend needs somewhere to run. For a personal deployment the best zero-cost
-option is an **Oracle Cloud Always Free VM** (a real server you keep forever, no
-charges) + Docker + a free Cloudflare Tunnel for HTTPS:
+The backend needs somewhere to run. The easiest path needs **no payment
+information anywhere**:
 
-* **Full step-by-step guide: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** —
-  VM creation → Docker → tunnel → GitHub OAuth app → `docker compose up -d --build`.
-* After deploying, users just set the **API base URL** in the extension options and
-  press **Sign in with GitHub** — no other configuration anywhere.
-* Backups are one tarred folder (`./data`); updates are `git pull && docker compose
-  up -d --build`.
+* **Render Free + Neon Postgres** — sign up with GitHub only (no card): Render
+  runs the app from the repo's `Dockerfile`, Neon keeps the database safe across
+  restarts. ~20 minutes, zero server admin.
+* Alternative: your **own free-forever VM** (Oracle Always Free — needs card
+  verification, never charged) with Docker, or even **your own PC** behind a free
+  Cloudflare tunnel.
+
+Full step-by-step for all three: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+After deploying, users just set the **API base URL** in the extension options and
+press **Sign in with GitHub** — no other configuration anywhere.
 
 ---
 
@@ -154,7 +157,7 @@ card in `chrome://extensions` — `dist/` is a build artifact and is never commi
 ## Testing
 
 ```bash
-# backend — 204 tests: unit + API integration + E2E against a mocked GitHub
+# backend — 208 tests: unit + API integration + E2E against a mocked GitHub
 cd backend && pytest
 
 # extension — 147 tests: adapter fixtures, language contract, bridge, auth, queue/backoff, manifest
@@ -179,7 +182,7 @@ Full details: [docs/SECURITY.md](docs/SECURITY.md).
 
 | Document | Contents |
 |---|---|
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Free-forever production hosting (VM + Docker + tunnel) |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Free-forever hosting with no payment info (Render+Neon), VM, or your PC |
 | [docs/API.md](docs/API.md) | Endpoint reference, payloads, error model |
 | [docs/CAPABILITY_MATRIX.md](docs/CAPABILITY_MATRIX.md) | What each platform adapter can and cannot do |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model and controls |
