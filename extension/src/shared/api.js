@@ -136,6 +136,8 @@ export function createApi({ baseUrl, token = null, fetchImpl, timeoutMs } = {}) 
   return {
     health: () => call('/health'),
     authMe: () => call('/auth/me'),
+    // Validate a GitHub PAT server-side; returns { api_token, github_login }.
+    connectWithPat: (gitHubToken) => call('/auth/pat', { method: 'POST', body: { token: gitHubToken } }),
     createSubmission: (submission) => call('/submissions', { method: 'POST', body: submission }),
     listSubmissions: (params = {}) => call(`/submissions${qs(params)}`),
     createSync: (submissionId) => call('/sync', { method: 'POST', body: { submission_id: submissionId } }),

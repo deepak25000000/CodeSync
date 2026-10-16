@@ -1,4 +1,5 @@
 import { createApi } from '../shared/api.js';
+import { connectWithGitHub } from '../shared/auth.js';
 import { DEFAULT_API_BASE_URL, PLATFORM_IDS, PLATFORM_LABELS } from '../shared/config.js';
 import { request } from '../shared/messaging.js';
 import { stableFingerprint, validateSubmission } from '../shared/schema.js';
@@ -513,6 +514,61 @@ async function saveSettings() {
   await loadPlatforms();
 }
 
+async function finishConnect(baseUrl, token, label) {
+  if (!(await ensurePermission(baseUrl))) {
+    toast('Host permission denied for that API origin', true);
+    return;
+  }
+  const response = await request('SET_SETTINGS', { apiBaseUrl: baseUrl, apiToken: token });
+  localSettings = response.settings;
+  api = apiFromSettings();
+  $('api-token').value = token;
+  toast(label);
+  await probeConnection();
+  await loadRemoteSettings();
+  await loadRepos();
+  await loadPlatforms();
+  await loadStats();
+  await refreshQueue();
+}
+
+async function oauthSignIn() {
+  const baseUrl = $('api-base-url').value.trim() || DEFAULT_API_BASE_URL;
+  $('test-result').className = 'hint';
+  $('test-result').textContent = 'Waiting for GitHub…';
+  try {
+    const token = await connectWithGitHub(baseUrl);
+    await finishConnect(baseUrl, token, 'Signed in with GitHub');
+    $('test-result').className = 'hint hint-ok';
+    $('test-result').textContent = 'Signed in — token stored automatically.';
+  } catch (err) {
+    setConnected(false);
+    $('test-result').className = 'hint hint-error';
+    $('test-result').textContent = `GitHub sign-in failed: ${err.message}. If the backend has no OAuth app, use the PAT option below.`;
+    $('pat-details').open = true;
+  }
+}
+
+async function patSignIn() {
+  const baseUrl = $('api-base-url').value.trim() || DEFAULT_API_BASE_URL;
+  const pat = $('github-pat').value.trim();
+  if (!pat) {
+    toast('Enter a GitHub personal access token first', true);
+    return;
+  }
+  if (!(await ensurePermission(baseUrl))) {
+    toast('Host permission denied for that API origin', true);
+    return;
+  }
+  try {
+    const out = await createApi({ baseUrl }).connectWithPat(pat);
+    $('github-pat').value = '';
+    await finishConnect(baseUrl, out.api_token, `Connected as ${out.github_login}`);
+  } catch (err) {
+    toast(`Connect failed: ${err.code ? `${err.code}: ` : ''}${err.message}`, true);
+  }
+}
+
 async function testConnection() {
   const form = readForm();
   $('test-result').className = 'hint';
@@ -624,6 +680,12 @@ async function clearQueue() {
 function bind() {
   $('btn-save').addEventListener('click', () => {
     saveSettings().catch((err) => toast(err.message, true));
+  });
+  $('btn-oauth').addEventListener('click', () => {
+    oauthSignIn().catch((err) => toast(err.message, true));
+  });
+  $('btn-pat').addEventListener('click', () => {
+    patSignIn().catch((err) => toast(err.message, true));
   });
   $('btn-test').addEventListener('click', () => {
     testConnection().catch((err) => toast(err.message, true));

@@ -28,13 +28,12 @@
       <section class="card" id="section-setup">
         <h2>First-time setup</h2>
         <ol class="hint setup-steps">
-          <li>Start the CodeSync backend and open its portal; connect GitHub and copy the <strong>one-time API token</strong>.</li>
-          <li>Paste the token under <strong>Connection</strong> below and press <em>Test connection</em>.</li>
-          <li>Pick a repository under <strong>Repository</strong>, choose your platforms, then press <em>Save settings</em>.</li>
+          <li>Under <strong>Connection</strong> below, press <em>Sign in with GitHub</em> — the backend issues your API token automatically; nothing to copy or paste.</li>
+          <li>Pick a repository under <strong>Repository</strong> (or create one), choose your platforms, then press <em>Save settings</em>.</li>
           <li>Submit a solution on LeetCode / GeeksforGeeks / CodeChef — it is detected automatically and lands in your GitHub repository.</li>
         </ol>
         <p class="hint">
-          Nothing to configure on the site itself: once the four steps above are done, just solve and submit as usual.
+          Nothing to configure on the site itself: once the steps above are done, just solve and submit as usual.
         </p>
       </section>
 
@@ -48,6 +47,28 @@
             test or save.
           </p>
         </div>
+        <div class="field">
+          <button id="btn-oauth" class="btn btn-primary" type="button">Sign in with GitHub</button>
+          <p class="hint">
+            One click: GitHub authorizes your backend, which issues the API token and stores it here automatically.
+          </p>
+        </div>
+        <details class="sub" id="pat-details">
+          <summary>No OAuth app on the backend? Connect with a GitHub PAT instead</summary>
+          <div class="row">
+            <input
+              id="github-pat"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="ghp_… (repo scope)"
+            />
+            <button id="btn-pat" class="btn" type="button">Connect</button>
+          </div>
+          <p class="hint">
+            The backend validates the PAT, creates your account and saves the API token here — also no copying.
+          </p>
+        </details>
         <div class="field">
           <label for="api-token">API token</label>
           <div class="row">

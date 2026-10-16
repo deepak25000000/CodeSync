@@ -202,4 +202,20 @@ describe('createApi', () => {
       ApiError,
     );
   });
+
+  it('connects with a GitHub PAT via /auth/pat (no token required yet)', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ api_token: 'cs_new', github_login: 'deepak' }));
+    const api = createApi({ baseUrl: 'http://127.0.0.1:8000', fetchImpl });
+
+    const out = await api.connectWithPat('ghp_test_pat');
+    expect(out.api_token).toBe('cs_new');
+    expect(out.github_login).toBe('deepak');
+
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('http://127.0.0.1:8000/api/v1/auth/pat');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ token: 'ghp_test_pat' });
+    // Pre-auth call: no bearer token on the request.
+    expect(init.headers.Authorization).toBeUndefined();
+  });
 });

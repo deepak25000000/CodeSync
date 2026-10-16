@@ -18,10 +18,12 @@ const EXPECTED_MATCHES = [
 describe('manifest.json', () => {
   it('is a valid MV3 manifest with a minimal permission set', () => {
     expect(manifest.manifest_version).toBe(3);
-    expect(manifest.permissions).toEqual(['storage', 'alarms']);
+    // `identity` powers the one-click GitHub sign-in (launchWebAuthFlow); the
+    // rest stay as narrow as possible.
+    expect(manifest.permissions).toEqual(['storage', 'alarms', 'identity']);
     expect(manifest.host_permissions).toEqual(['http://127.0.0.1/*', 'http://localhost/*']);
     expect(manifest.optional_host_permissions).toEqual(['https://*/*', 'http://*/*']);
-    for (const forbidden of ['identity', 'tabs', 'webRequest', 'scripting', 'downloads']) {
+    for (const forbidden of ['tabs', 'webRequest', 'scripting', 'downloads']) {
       expect(manifest.permissions ?? []).not.toContain(forbidden);
     }
   });
