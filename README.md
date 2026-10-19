@@ -194,4 +194,16 @@ Full details: [docs/SECURITY.md](docs/SECURITY.md).
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Phase plan |
 | [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md) | Delivery report, test results, known limits |
 
+## Contributors
+
+* **Deepak Thorat** ([@deepak25000000](https://github.com/deepak25000000)) — creator &
+  maintainer: idea and requirements, live testing on the real platforms, and the
+  GitHub side of the project.
+* **OpenCode** — the AI coding agent (MiMo model) that designed and built this
+  repository: architecture, FastAPI backend, Chrome MV3 extension, the full 355-test
+  suites, documentation and release packaging — credited here the same way Claude is
+  credited in other repositories.
+
+Built with [OpenCode](https://opencode.ai).
+
 MIT © Deepak Thorat.
