@@ -183,6 +183,7 @@ Full details: [docs/SECURITY.md](docs/SECURITY.md).
 | Document | Contents |
 |---|---|
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Free-forever hosting with no payment info (Render+Neon), VM, or your PC |
+| [docs/MANUAL_SETUP.md](docs/MANUAL_SETUP.md) | Human checklist to finish the project: local, deploy, connect, cleanup |
 | [docs/API.md](docs/API.md) | Endpoint reference, payloads, error model |
 | [docs/CAPABILITY_MATRIX.md](docs/CAPABILITY_MATRIX.md) | What each platform adapter can and cannot do |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model and controls |
