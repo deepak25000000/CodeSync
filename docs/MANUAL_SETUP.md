@@ -9,6 +9,16 @@ GitHub). The code, tests, release package and docs are already finished:
 
 Work through the phases in order. Each ends with a **Done when** check.
 
+## Status (updated 2026-10-31)
+
+| Phase | Status |
+|---|---|
+| 1 — Local setup | done |
+| 2 — Deploy backend | **done** — live at `https://codesync-eo38.onrender.com` (`/api/v1/health` ok; OAuth not configured, PAT flow active) |
+| 3 — Connect extension to production | remaining — set API base URL to the Render URL in Options |
+| 4 — Security cleanup | remaining — rotate the exposed PAT; retire/clean the test repo |
+| 5 — Publish | commit ready locally (`60b8877`) — run `git push` from a machine with GitHub credentials |
+
 ---
 
 ## Phase 1 — Finalize the local setup (5 min)

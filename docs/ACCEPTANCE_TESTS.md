@@ -1,7 +1,7 @@
 # Acceptance tests (human, live environment)
 
-Everything automated is covered by `backend/pytest` (145 tests) and
-`extension/npm test` (113 tests). This checklist is for the parts that **cannot** be
+Everything automated is covered by `backend/pytest` (208 tests) and
+`extension/npm test` (147 tests). This checklist is for the parts that **cannot** be
 honest without real accounts: live platform DOMs, real GitHub, a real browser.
 
 Prerequisites: backend running with a real `CREDENTIALS_KEY`, extension built and

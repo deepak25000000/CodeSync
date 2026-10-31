@@ -51,11 +51,11 @@
 
 | Suite | Result |
 |---|---|
-| `cd backend && pytest` | **145 passed** |
+| `cd backend && pytest` | **208 passed** |
 | `cd backend && ruff check .` | clean |
 | `cd backend && ruff format --check .` | clean |
-| `cd backend && mypy app` | `Success: no issues found in 25 source files` |
-| `cd extension && npm test` | **113 passed** (11 files) |
+| `cd backend && mypy app` | `Success: no issues found in 26 source files` |
+| `cd extension && npm test` | **147 passed** (14 files) |
 | `cd extension && npm run build` | `dist/` with manifest, background, content, popup, options |
 | Live boot (`uvicorn app.main:app`) | `/health` ok, portal 200, `/docs` 200, unauthenticated `/auth/me` → 401, `/meta` lists 4 platforms |
 | `alembic upgrade head` / `downgrade base` / `check` | round-trip clean; no model drift |
