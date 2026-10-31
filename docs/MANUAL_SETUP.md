@@ -17,7 +17,7 @@ Work through the phases in order. Each ends with a **Done when** check.
 | 2 — Deploy backend | **done** — live at `https://codesync-eo38.onrender.com` (`/api/v1/health` ok; OAuth not configured, PAT flow active) |
 | 3 — Connect extension to production | remaining — set API base URL to the Render URL in Options |
 | 4 — Security cleanup | remaining — rotate the exposed PAT; retire/clean the test repo |
-| 5 — Publish | commit ready locally (`60b8877`) — run `git push` from a machine with GitHub credentials |
+| 5 — Publish | **done** — pushed to `github.com/deepak25000000/CodeSync` |
 
 ---
 
