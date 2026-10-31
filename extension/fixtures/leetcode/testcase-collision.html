@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Maximize Sum After At Most K Digit Rearrangements - LeetCode</title>
+  </head>
+  <body>
+    <!-- Live LeetCode layout: the *test-case input* editor appears in the
+         DOM before the solution editor. Without container exclusion +
+         code scoring, extractCode returns the test-case blob. -->
+    <h1 data-cy="question-title">Maximize Sum After At Most K Digit Rearrangements</h1>
+    <div class="submission-status">Accepted</div>
+    <div class="lang-select" data-cy="lang-select">
+      <span class="ant-select-selection-item">Python3</span>
+    </div>
+
+    <!-- Test-case input (appears first in DOM on the live site). -->
+    <div class="testcase-input" data-cy="testcase-input">
+      <div class="editor">
+        <div class="cm-content" contenteditable="true">
+          <div class="cm-line">[123,45]</div>
+          <div class="cm-line">1</div>
+          <div class="cm-line">[102,90,14]</div>
+          <div class="cm-line">2</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Real solution editor. -->
+    <div class="editor-wrapper">
+      <div class="editor">
+        <div class="cm-content" contenteditable="true">
+          <div class="cm-line">class Solution:</div>
+          <div class="cm-line">    def minSum(self, nums, k):</div>
+          <div class="cm-line">        s = sum(nums)</div>
+          <div class="cm-line">        for _ in range(k):</div>
+          <div class="cm-line">            m = max(nums)</div>
+          <div class="cm-line">            nums[nums.index(m)] = m - 1</div>
+          <div class="cm-line">            s -= 1</div>
+          <div class="cm-line">        return s</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

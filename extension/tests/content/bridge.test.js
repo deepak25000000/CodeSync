@@ -21,6 +21,11 @@ afterEach(() => {
   setBridgeText(EMPTY);
   window.postMessage = realPostMessage;
   document.body.innerHTML = '';
+  // Each window.eval(bridgeMainSource) leaves a permanent message listener
+  // that reads these globals; clear them so a later test never sees a prior
+  // test's editors (jsdom delete can leave the property visible to handlers).
+  window.monaco = null;
+  window.ace = null;
 });
 
 describe('bridge text cache (isolated side)', () => {
@@ -112,6 +117,40 @@ describe('requestBridge protocol', () => {
 });
 
 describe('page-world bridge (bridge-main.js)', () => {
+  // Eval the page-world script exactly once for this suite. Each eval registers
+  // another permanent message listener, so re-evaling per test makes earlier
+  // handlers answer later requests with stale editor globals.
+  let evalDone = false;
+  function ensureBridgeEvaluated() {
+    if (evalDone) return;
+    window.eval(bridgeMainSource);
+    evalDone = true;
+  }
+
+  function requestOnce(id) {
+    return new Promise((resolve) => {
+      const onMessage = (event) => {
+        const data = event.data;
+        if (
+          data &&
+          data.source === 'codesync-bridge' &&
+          data.type === 'response' &&
+          data.id === id
+        ) {
+          window.removeEventListener('message', onMessage);
+          resolve(data);
+        }
+      };
+      window.addEventListener('message', onMessage);
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { source: 'codesync-bridge', type: 'request', id },
+          source: window,
+        }),
+      );
+    });
+  }
+
   it('answers requests with full Monaco model and ACE editor text', async () => {
     // Stub the page's editor globals exactly as LeetCode/GFG would expose them.
     window.monaco = {
@@ -134,53 +173,50 @@ describe('page-world bridge (bridge-main.js)', () => {
       },
     };
 
-    const responsePromise = new Promise((resolve) => {
-      window.addEventListener('message', function onMessage(event) {
-        const data = event.data;
-        if (data && data.source === 'codesync-bridge' && data.type === 'response') {
-          window.removeEventListener('message', onMessage);
-          resolve(data);
-        }
-      });
-    });
-
-    window.eval(bridgeMainSource);
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        data: { source: 'codesync-bridge', type: 'request', id: 42 },
-        source: window,
-      }),
-    );
-
-    const response = await responsePromise;
+    ensureBridgeEvaluated();
+    const response = await requestOnce(42);
     expect(response.id).toBe(42);
     expect(response.monaco).toBe('def solve():\n    return 42\n# lines past the viewport');
     expect(response.ace).toBe('print(1)\nprint(2)');
-    // Language rides along with the LONGEST model (the real solution), and the
-    // ACE mode id is reduced to its bare segment.
+    // Language rides along with the chosen (highest-scoring code) model, and
+    // the ACE mode id is reduced to its bare segment.
     expect(response.monacoLang).toBe('python3');
     expect(response.aceLang).toBe('python');
-    delete window.monaco;
+  });
+
+  it('prefers the solution model over a longer test-case input model', async () => {
+    // LeetCode registers a second Monaco model for the *test-case input*
+    // (plaintext/json). It can be longer than a short solution; scoring must
+    // still pick the real code model so we never push `[123,45]\n1` to GitHub.
+    window.monaco = {
+      editor: {
+        getModels: () => [
+          {
+            getValue: () =>
+              '[123,45]\n1\n[102,90,14]\n2\n[999,999]\n3\n[1,2,3,4,5,6,7,8,9,10]\n10\n[50,60]\n4',
+            getLanguage: () => 'plaintext',
+          },
+          {
+            getValue: () => 'class Solution:\n    def minSum(self, nums, k):\n        return sum(nums)',
+            getLanguage: () => 'python3',
+          },
+        ],
+      },
+    };
+    document.body.innerHTML = '';
+
+    ensureBridgeEvaluated();
+    const response = await requestOnce(44);
+    expect(response.monaco).toContain('class Solution:');
+    expect(response.monaco).not.toContain('[123,45]');
+    expect(response.monacoLang).toBe('python3');
   });
 
   it('returns nulls instead of throwing when editors are missing', async () => {
-    window.eval(bridgeMainSource);
-    const responsePromise = new Promise((resolve) => {
-      window.addEventListener('message', function onMessage(event) {
-        const data = event.data;
-        if (data && data.source === 'codesync-bridge' && data.type === 'response') {
-          window.removeEventListener('message', onMessage);
-          resolve(data);
-        }
-      });
-    });
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        data: { source: 'codesync-bridge', type: 'request', id: 43 },
-        source: window,
-      }),
-    );
-    const response = await responsePromise;
+    window.monaco = null;
+    window.ace = null;
+    ensureBridgeEvaluated();
+    const response = await requestOnce(43);
     expect(response.monaco).toBeNull();
     expect(response.ace).toBeNull();
     expect(response.monacoLang).toBeNull();

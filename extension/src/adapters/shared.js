@@ -219,8 +219,61 @@ export function sniffLanguage(code) {
 
 function cleanEditorText(text) {
   if (text === null || text === undefined) return null;
-  const cleaned = String(text).replace(/[\u200b\u200c\u200d\ufeff]/g, '');
+  const cleaned = String(text).replace(/[​‌‍﻿]/g, '');
   return cleaned.trim() ? cleaned : null;
+}
+
+// Heuristic: does this blob look like program source rather than raw data?
+// LeetCode pages host a second editor for *test-case input* (`[123,45]\n1`)
+// beside the real solution; without this check the first non-empty editor
+// wins and the wrong blob is pushed to GitHub.
+const CODE_HINT_RE =
+  /\b(?:def|class|function|return|import|from|public|private|static|void|const|let|var|for|while|if|else|elif|try|except|catch|throw|new|this|self|struct|enum|interface|package|using|namespace|template|printf|println|console|print|puts|fn|func|match|impl|end|do|then|function)\b|#include|int\s+main|System\.out|fmt\.|=>|->|::/;
+
+// LeetCode (and similar judges) wrap the *test-case input* editor in a
+// container whose id/class/aria-label mentions testcase/test-case/custom
+// input — never treat that editor as the solution.
+const TESTCASE_CONTAINER_RE =
+  /test[-_ ]?case|custom[-_ ]?input|example[-_ ]?input|sample[-_ ]?input|console[-_ ]?input|result[-_ ]?input|input[-_ ]?editor/i;
+
+function inTestcaseContainer(el) {
+  for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+    const id = node.id || '';
+    const cls = typeof node.className === 'string' ? node.className : '';
+    const aria = (node.getAttribute && node.getAttribute('aria-label')) || '';
+    const dataCy = (node.getAttribute && node.getAttribute('data-cy')) || '';
+    const locator = (node.getAttribute && node.getAttribute('data-e2e-locator')) || '';
+    if (TESTCASE_CONTAINER_RE.test(`${id} ${cls} ${aria} ${dataCy} ${locator}`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function looksLikeCode(text) {
+  if (!text) return false;
+  if (CODE_HINT_RE.test(text)) return true;
+  // Indented multi-line blocks are almost never raw judge input.
+  const lines = text.split('\n');
+  if (lines.length >= 3 && lines.filter((l) => /^[ \t]+\S/.test(l)).length >= 2) {
+    return true;
+  }
+  return false;
+}
+
+// Higher score = more likely the solution editor. Test-case input like
+// `[123,45]\n1` scores low; a short Python/Java/C++ solution scores well.
+function scoreCodeCandidate(text) {
+  if (!text || !text.trim()) return -1;
+  let score = 0;
+  if (looksLikeCode(text)) score += 100;
+  // Longer non-trivial blobs edge out stubs when both look like code.
+  score += Math.min(String(text).length / 200, 20);
+  // Pure bracket/number/comma lines are judge input, not source.
+  if (/^[\[\]{}()0-9,\s.\-eE+:"']+$/.test(text.trim()) && !CODE_HINT_RE.test(text)) {
+    score -= 50;
+  }
+  return score;
 }
 
 // Full text (and reported language) of virtualized editors (Monaco/ACE)
@@ -279,8 +332,30 @@ export function editorText(el) {
 }
 
 export function extractCode(doc, selectors) {
-  for (const selector of Array.isArray(selectors) ? selectors : [selectors]) {
+  const list = Array.isArray(selectors) ? selectors : [selectors];
+  let best = null;
+  let bestScore = -1;
+  for (const selector of list) {
     for (const el of queryAll(doc, selector)) {
+      // Never lift the judge's test-case input box (LeetCode shows one
+      // beside the real editor); its container is labelled testcase/custom.
+      if (inTestcaseContainer(el)) continue;
+      const text = editorText(el);
+      if (!text) continue;
+      const score = scoreCodeCandidate(text);
+      if (score > bestScore) {
+        best = text;
+        bestScore = score;
+      }
+    }
+  }
+  // Prefer anything that looks like source even if a later selector scored
+  // a pure-data blob higher by length alone.
+  if (best && bestScore > 0) return best;
+  // Fall back to first non-empty (previous behaviour) if scoring rejected all.
+  for (const selector of list) {
+    for (const el of queryAll(doc, selector)) {
+      if (inTestcaseContainer(el)) continue;
       const text = editorText(el);
       if (text) return text;
     }

@@ -15,10 +15,45 @@
 // script simply keeps using DOM extraction.
 const SOURCE = 'codesync-bridge';
 
-function keepBest(best, text, lang) {
-  if (typeof text === 'string' && text.trim() && (!best || text.length > best.text.length)) {
-    return { text, lang: lang || null };
+// Monaco language ids that mean "this model is the solution editor", not the
+// judge's test-case input box (which is usually plaintext/json/empty).
+const CODE_LANG_RE =
+  /^(python3?|pypy3?|javascript|typescript|java|csharp|cpp|c|golang|go|rust|kotlin|swift|ruby|scala|php|dart|elixir|erlang|r|bash|mysql|postgresql|mssql|oracle)$/i;
+const NON_CODE_LANG_RE = /^(json|jsonc|markdown|log|text|plaintext|shellsession|xml|html|css|scss|yaml|ini)$/i;
+
+function langIsCode(lang) {
+  if (!lang) return false;
+  const id = String(lang).split('/').pop().toLowerCase();
+  if (NON_CODE_LANG_RE.test(id)) return false;
+  return CODE_LANG_RE.test(id);
+}
+
+function looksLikeSource(text) {
+  if (typeof text !== 'string' || !text.trim()) return false;
+  // Real solutions almost always have keywords/structure; test-case input
+  // is bare arrays/numbers like "[123,45]\n1".
+  return /(?:^|\n)\s*(?:def |class |public |private |static |void |function |const |let |var |#include|using |package |fn |func |import |from |return |if |for |while )/.test(
+    text,
+  ) || /[{};]\s*$/m.test(text) || /\breturn\b/.test(text);
+}
+
+function modelScore(text, lang) {
+  if (typeof text !== 'string' || !text.trim()) return -1;
+  let score = 0;
+  if (langIsCode(lang)) score += 100;
+  if (looksLikeSource(text)) score += 50;
+  score += Math.min(text.length / 200, 20);
+  // Pure bracket/number blobs (test-case input) are never the solution.
+  if (/^[\[\]{}()0-9,\s.\-eE+:"']+$/.test(text.trim()) && !looksLikeSource(text)) {
+    score -= 80;
   }
+  return score;
+}
+
+function keepBest(best, text, lang) {
+  const score = modelScore(text, lang);
+  if (score < 0) return best;
+  if (!best || score > best.score) return { text, lang: lang || null, score };
   return best;
 }
 

@@ -91,6 +91,24 @@ describe('leetcode adapter', () => {
     expect(normalize_submission(leetcode, raw).language).toBe('Python3');
   });
 
+  it('prefers the solution editor over the test-case input editor', () => {
+    // Live LeetCode pages put the test-case input (`.cm-content` with
+    // `[123,45]\n1`) in the DOM *before* the real solution editor. The
+    // extractor must skip the testcase container and score real code higher.
+    const doc = fixtureDoc('leetcode/testcase-collision.html');
+    const url = 'https://leetcode.com/problems/maximize-sum-after-at-most-k-digit-rearrangements/';
+    const code = leetcode.extractSolutionCode(doc);
+    expect(code).toContain('class Solution:');
+    expect(code).toContain('def minSum(self, nums, k):');
+    expect(code).not.toContain('[123,45]');
+    expect(code).not.toMatch(/^\s*\[102,90,14\]/m);
+
+    const raw = leetcode.detect_submission(doc, url);
+    expect(raw.verdict).toBe('accepted');
+    expect(raw.code).toContain('def minSum');
+    expect(raw.code).not.toContain('[123,45]');
+  });
+
   it('extracts a rejected submission', () => {
     const doc = fixtureDoc('leetcode/rejected.html');
     expect(leetcode.extractSubmissionStatus(doc)).toBe('rejected');
