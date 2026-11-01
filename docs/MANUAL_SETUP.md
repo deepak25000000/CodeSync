@@ -9,15 +9,16 @@ GitHub). The code, tests, release package and docs are already finished:
 
 Work through the phases in order. Each ends with a **Done when** check.
 
-## Status (updated 2026-10-31)
+## Status (updated 2026-11-01)
 
 | Phase | Status |
 |---|---|
 | 1 — Local setup | done |
 | 2 — Deploy backend | **done** — live at `https://codesync-eo38.onrender.com` (`/api/v1/health` ok; OAuth not configured, PAT flow active) |
-| 3 — Connect extension to production | remaining — set API base URL to the Render URL in Options |
-| 4 — Security cleanup | remaining — rotate the exposed PAT; retire/clean the test repo |
+| 3 — Connect extension to production | **done** — verified end-to-end: accepted LeetCode submissions land in `DSA-Solutions` with real solution code |
+| 4 — Security cleanup | remaining — rotate the exposed PAT; optionally clean the test repo |
 | 5 — Publish | **done** — pushed to `github.com/deepak25000000/CodeSync` |
+| Optional hardening | UptimeRobot keep-alive; GitHub OAuth app for one-click sign-in; Web Store |
 
 ---
 
